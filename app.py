@@ -20,20 +20,43 @@ model = genai.GenerativeModel("gemini-1.5-pro")
 st.set_page_config(page_title="Food Calorie Estimator", page_icon="🍽️")
 
 st.title("🍽️ Food Calorie Estimator")
-st.write("Upload an image of your meal and get an estimated calorie count.")
+st.write("Upload or take a photo of your meal to estimate calories.")
 
 # -----------------------
-# File Upload
+# Input options
 # -----------------------
-uploaded_file = st.file_uploader(
-    "Upload a food image",
-    type=["jpg", "jpeg", "png"]
+option = st.radio(
+    "Choose input method:",
+    ["Upload Image", "Take Photo"]
 )
 
-if uploaded_file:
-    image = Image.open(uploaded_file)
+image = None
 
-    st.image(image, caption="Uploaded Image", use_column_width=True)
+# -----------------------
+# Upload option
+# -----------------------
+if option == "Upload Image":
+    uploaded_file = st.file_uploader(
+        "Upload a food image",
+        type=["jpg", "jpeg", "png"]
+    )
+    if uploaded_file:
+        image = Image.open(uploaded_file)
+
+# -----------------------
+# Camera option
+# -----------------------
+elif option == "Take Photo":
+    camera_image = st.camera_input("Take a photo")
+
+    if camera_image:
+        image = Image.open(camera_image)
+
+# -----------------------
+# Show image + process
+# -----------------------
+if image:
+    st.image(image, caption="Selected Image", use_column_width=True)
 
     if st.button("Estimate Calories 🔍"):
         with st.spinner("Analyzing your food..."):
@@ -65,7 +88,6 @@ if uploaded_file:
             - Mention assumptions
             """
 
-            # Generate response
             response = model.generate_content(
                 [
                     prompt,
