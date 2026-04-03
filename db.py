@@ -21,6 +21,14 @@ DB_PATH = DATA_DIR / "app.db"
 PROFILE_IMAGES_DIR = DATA_DIR / "profile_images"
 
 
+def _bcrypt_secret(password: str) -> str:
+    """Bcrypt only accepts secrets up to 72 bytes; normalize longer UTF-8 passwords."""
+    raw = password.encode("utf-8")
+    if len(raw) <= 72:
+        return password
+    return hashlib.sha256(raw).hexdigest()
+
+
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
@@ -190,7 +198,7 @@ def verify_user(login_email: str, password: str) -> int | None:
         ).fetchone()
     if row is None:
         return None
-    if not bcrypt.verify(password, row["password_hash"]):
+    if not bcrypt.verify(_bcrypt_secret(password), row["password_hash"]):
         return None
     return int(row["id"])
 
@@ -317,7 +325,7 @@ def mark_reset_token_used(token_plain: str) -> None:
 def update_user_password(user_id: int, new_password: str) -> tuple[bool, str]:
     if len(new_password) < 6:
         return False, "Password must be at least 6 characters."
-    ph = bcrypt.hash(new_password)
+    ph = bcrypt.hash(_bcrypt_secret(new_password))
     with get_conn() as conn:
         conn.execute(
             "UPDATE users SET password_hash = ? WHERE id = ?",
