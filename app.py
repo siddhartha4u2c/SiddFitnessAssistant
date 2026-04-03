@@ -761,13 +761,17 @@ def render_main_content() -> None:
             st.markdown("##### Profile photo")
             pimg_path = db.profile_image_path(uid)
             _has_prof_photo = db.has_profile_image(uid)
+            # New key after each successful file save so Streamlit clears the uploader. Otherwise the
+            # same file stays selected across reruns and we save+rerun every run—never reaching the form.
+            _prof_upload_k = int(st.session_state.get("profile_photo_uploader_key", 0))
+            _prof_up_key = f"profile_photo_uploader_{_prof_upload_k}"
             cam_shot = None
             if _has_prof_photo:
                 st.image(str(pimg_path), width=140)
                 up_prof = st.file_uploader(
                     "profile_file",
                     type=["jpg", "jpeg", "png"],
-                    key="profile_photo_uploader",
+                    key=_prof_up_key,
                     label_visibility="collapsed",
                 )
             else:
@@ -777,7 +781,7 @@ def render_main_content() -> None:
                     up_prof = st.file_uploader(
                         "profile_file",
                         type=["jpg", "jpeg", "png"],
-                        key="profile_photo_uploader",
+                        key=_prof_up_key,
                         label_visibility="collapsed",
                     )
                 with cam_col:
@@ -793,6 +797,7 @@ def render_main_content() -> None:
                     st.session_state.profile_photo_cam_widget_key = (
                         int(st.session_state.get("profile_photo_cam_widget_key", 0)) + 1
                     )
+                    st.session_state["profile_photo_uploader_key"] = _prof_upload_k + 1
                     st.success("Profile photo removed.")
                     st.rerun()
 
@@ -803,6 +808,7 @@ def render_main_content() -> None:
                     im = Image.open(up_prof).convert("RGB")
                     im.thumbnail((1024, 1024))
                     im.save(pimg_path, "JPEG", quality=88)
+                    st.session_state["profile_photo_uploader_key"] = _prof_upload_k + 1
                     _photo_saved = True
                 except Exception as exc:
                     st.error(f"Could not save photo: {exc}")
@@ -815,6 +821,7 @@ def render_main_content() -> None:
                     st.session_state.profile_photo_cam_widget_key = (
                         int(st.session_state.get("profile_photo_cam_widget_key", 0)) + 1
                     )
+                    st.session_state["profile_photo_uploader_key"] = _prof_upload_k + 1
                     _photo_saved = True
                 except Exception as exc:
                     st.error(f"Could not save camera photo: {exc}")
