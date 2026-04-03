@@ -750,6 +750,9 @@ def _signed_in_theme_css() -> str:
 
 
 def render_main_content() -> None:
+    if not active:
+        st.info("Sign in or register (left) to use your profile, meal photos, saved logs, and coaching.")
+
     if uid:
         prof = db.get_profile(uid)
         _prof_ok = profile_has_required_fields(prof)
@@ -1321,10 +1324,16 @@ def render_main_content() -> None:
 
     if "meal_camera_open" not in st.session_state:
         st.session_state.meal_camera_open = False
+    if not active:
+        st.session_state.meal_camera_open = False
 
-    st.caption(
-        "Optional: upload a food photo, or tap **Take food photo** to open the camera—combined with your description when both are provided."
-    )
+    if active:
+        st.caption(
+            "Optional: upload a food photo, or tap **Take food photo** to open the camera—combined "
+            "with your description when both are provided."
+        )
+    else:
+        st.caption("Sign in or register to upload meal photos and run calorie estimates.")
     _fu, _cam_btn = st.columns(2, gap="small")
     with _fu:
         meal_up = st.file_uploader(
@@ -1332,6 +1341,7 @@ def render_main_content() -> None:
             type=["jpg", "jpeg", "png"],
             key="meal_estimate_photo_file",
             label_visibility="collapsed",
+            disabled=not active,
         )
     with _cam_btn:
         if not st.session_state.meal_camera_open:
@@ -1347,7 +1357,7 @@ def render_main_content() -> None:
                 st.rerun()
 
     meal_cam = None
-    if st.session_state.meal_camera_open:
+    if active and st.session_state.meal_camera_open:
         _meal_cam_k = st.session_state.setdefault("meal_estimate_cam_widget_key", 0)
         meal_cam = st.camera_input(
             "Food photo",
@@ -1447,6 +1457,7 @@ if active:
             st.session_state.user_id = None
             st.session_state.username = None
             st.session_state.last_meal_context = ""
+            st.session_state.meal_camera_open = False
             st.session_state.pop("show_daily_calorie_results", None)
             st.rerun()
     render_main_content()
