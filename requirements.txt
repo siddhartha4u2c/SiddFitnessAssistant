@@ -1,3 +1,7 @@
 streamlit
+openai>=1.0.0
 google-generativeai
+google-genai
 Pillow
+python-dotenv
+passlib[bcrypt]
