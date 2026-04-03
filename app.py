@@ -753,10 +753,11 @@ def render_main_content() -> None:
     if uid:
         prof = db.get_profile(uid)
         _prof_ok = profile_has_required_fields(prof)
-        with st.expander(
-            "My profile — preferences, health, and lifestyle",
-            expanded=not _prof_ok,
-        ):
+
+        def _render_profile_editor() -> None:
+            # Streamlit expanders only use expanded= on first paint; after photo save + rerun the
+            # section can stay collapsed and hide the form. When required fields are missing, render
+            # outside an expander so fields stay visible.
             st.markdown("##### Profile photo")
             pimg_path = db.profile_image_path(uid)
             _has_prof_photo = db.has_profile_image(uid)
@@ -1042,12 +1043,19 @@ def render_main_content() -> None:
                     st.success("Profile saved.")
                     st.rerun()
 
-        if not profile_has_required_fields(db.get_profile(uid)):
-            st.warning(
-                "Complete **My profile** above and save: **body weight (kg)**, **height (feet)**, "
-                "**gender**, and **activity level** are required before daily calories, meal estimates, "
-                "coach chat, and the weekly plan."
+        if not _prof_ok:
+            st.markdown("### My profile — preferences, health, and lifestyle")
+            st.caption(
+                "Scroll below your photo to **Personal** for weight, height, gender, and activity level, "
+                "then **Save profile**."
             )
+            _render_profile_editor()
+        else:
+            with st.expander("My profile — preferences, health, and lifestyle", expanded=False):
+                _render_profile_editor()
+
+        if not profile_has_required_fields(db.get_profile(uid)):
+            st.warning("Please fill mandatory fields above to avail the services")
             return
 
         with st.expander("1-week training & meal plan", expanded=False):
