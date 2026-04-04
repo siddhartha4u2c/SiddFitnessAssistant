@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import socket
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+
+_logger = logging.getLogger(__name__)
 
 
 def _smtp_password() -> str:
@@ -61,6 +64,13 @@ def _send_smtp_plain(to_address: str, subject: str, body: str) -> None:
             smtp.starttls()
             smtp.login(user, password)
             smtp.sendmail(sender, [to_address], msg.as_string())
+        _logger.info(
+            "SMTP send OK: from=%s to=%s subject=%r server=%s",
+            sender,
+            to_address,
+            subject,
+            server,
+        )
     except socket.gaierror as e:
         raise RuntimeError(_dns_err.format(e)) from e
     except OSError as e:

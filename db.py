@@ -379,7 +379,10 @@ def create_user(login_email: str, password: str) -> tuple[bool, str]:
         if has_unused_valid_verification_token(existing_id):
             return (
                 False,
-                "An activation link was already sent to this email address. Check your inbox and spam. "
+                "An activation link was already sent to this email address. Check **inbox and spam**, "
+                "and wait a few minutes. If nothing arrives, the host may have **SMTP misconfigured** "
+                "(e.g. on Render: set **SMTP_*** and **MAIL_DEFAULT_SENDER** in Environment)—use "
+                "**Resend activation email** below with your password. "
                 "That link is valid for **1 hour**—you cannot register again with this email until it "
                 "expires. After it expires, the old link stops working and you can register again with "
                 "the same email; a **new** activation email will be sent.",
@@ -698,6 +701,30 @@ def mark_reset_token_used(token_plain: str) -> None:
             "UPDATE password_reset_tokens SET used_at = ? WHERE token_hash = ?",
             (_utc_now_iso(), h),
         )
+
+
+def try_resend_activation_email(login_email: str, password: str) -> tuple[bool, str, int | None]:
+    """For an **unverified** account, if the password matches, caller may send a fresh activation email.
+
+    Returns ``(ok, message, user_id)``. ``user_id`` is set only when ``ok`` is True.
+    """
+    login_email = normalize_login_email(login_email)
+    if not login_email:
+        return False, "Enter your email address.", None
+    if not is_valid_login_email(login_email):
+        return False, "Please enter a valid email address.", None
+    uid = get_user_id_by_login_email(login_email)
+    if uid is None:
+        return False, "No unactivated account found for that email.", None
+    if is_user_email_verified(uid):
+        return False, "That account is already activated—sign in instead.", None
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT password_hash FROM users WHERE id = ?", (uid,)
+        ).fetchone()
+    if not row or not bcrypt.verify(_bcrypt_secret(password), row["password_hash"]):
+        return False, "Incorrect password for that email.", None
+    return True, "", uid
 
 
 def create_email_verification_token(user_id: int) -> str:

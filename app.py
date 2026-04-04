@@ -18,6 +18,22 @@ import workout_plan
 load_dotenv(Path(__file__).resolve().parent / ".env")
 db.init_db()
 
+
+def _public_app_base_url() -> str:
+    return (os.getenv("PASSWORD_RESET_APP_URL") or "http://localhost:8501").rstrip("/")
+
+
+def _warn_if_render_app_url_is_localhost() -> None:
+    base = _public_app_base_url()
+    if os.getenv("RENDER", "").lower() == "true" and "localhost" in base.lower():
+        st.warning(
+            "Production check: **PASSWORD_RESET_APP_URL** still points at localhost. "
+            "In your Render service **Environment**, set it to your live URL, e.g. "
+            "`https://your-service.onrender.com` (no trailing slash), so activation and "
+            "reset links in emails work."
+        )
+
+
 st.set_page_config(
     page_title="SID Fitness Assistant",
     page_icon="🏋️",
@@ -2758,9 +2774,7 @@ else:
                     "Enter the **email you use to sign in**, or the **email saved on your profile**. "
                     "Password reset works by email only—the link is sent to that address."
                 )
-                base_url = (os.getenv("PASSWORD_RESET_APP_URL") or "http://localhost:8501").rstrip(
-                    "/"
-                )
+                base_url = _public_app_base_url()
                 if st.button("Send reset link", use_container_width=False, key="btn_forgot_send"):
                     fid = (lu or "").strip()
                     if not fid:
@@ -2787,6 +2801,7 @@ else:
                         if send_error:
                             st.error(f"Could not send email: {send_error}")
                         elif uid_f and email_f:
+                            _warn_if_render_app_url_is_localhost()
                             st.success(
                                 "Message sent. Check that inbox and spam; the link expires in **1 hour**."
                             )
@@ -2806,6 +2821,51 @@ else:
             rp2 = st.text_input(
                 "Confirm password", type="password", key="reg_unified_pass2"
             )
+            with st.expander("Didn't get the activation email?", expanded=False):
+                st.caption(
+                    "If you already created an account but no message arrived, enter the **same email "
+                    "and password** to send a **new** link (the previous one will be replaced)."
+                )
+                ra_em = st.text_input(
+                    "Email",
+                    key="resend_activation_email",
+                    autocomplete="email",
+                    placeholder="you@example.com",
+                )
+                ra_pw = st.text_input(
+                    "Password",
+                    type="password",
+                    key="resend_activation_pass",
+                    autocomplete="new-password",
+                )
+                if st.button("Resend activation email", key="btn_resend_activation"):
+                    if not mailer.smtp_configured():
+                        st.error(
+                            "SMTP is not configured on the server. The operator must set "
+                            "SMTP_SERVER, SMTP_USERNAME, SMTP_PASSWORD, and MAIL_DEFAULT_SENDER."
+                        )
+                    else:
+                        ok_r, msg_r, uid_r = db.try_resend_activation_email(ra_em, ra_pw)
+                        if not ok_r:
+                            st.error(msg_r)
+                        elif uid_r is not None:
+                            base_r = _public_app_base_url()
+                            try:
+                                vtok_r = db.create_email_verification_token(uid_r)
+                                vlink_r = f"{base_r}?verify_email={vtok_r}"
+                                prof = db.get_profile(uid_r)
+                                to_addr = (prof.get("email") or "").strip() or db.normalize_login_email(
+                                    ra_em
+                                )
+                                mailer.send_email_verification_email(to_addr, vlink_r)
+                            except Exception as exc:
+                                st.error(f"Could not send activation email: {exc}")
+                            else:
+                                _warn_if_render_app_url_is_localhost()
+                                st.success(
+                                    "A new activation link was sent. Check inbox and spam; "
+                                    "it expires in **1 hour**."
+                                )
             if st.button(
                 "Create account", use_container_width=True, key="btn_reg_unified", type="primary"
             ):
@@ -2836,9 +2896,7 @@ else:
                                     uid_new,
                                     {"email": db.normalize_login_email(em)},
                                 )
-                                base_reg = (
-                                    os.getenv("PASSWORD_RESET_APP_URL") or "http://localhost:8501"
-                                ).rstrip("/")
+                                base_reg = _public_app_base_url()
                                 send_err: str | None = None
                                 try:
                                     vtok = db.create_email_verification_token(uid_new)
@@ -2852,6 +2910,7 @@ else:
                                     db.delete_user_account(uid_new)
                                     st.error(f"Could not send activation email: {send_err}")
                                 else:
+                                    _warn_if_render_app_url_is_localhost()
                                     st.success(
                                         "Check your email for the activation link. It expires in **1 hour**. "
                                         "After you click it, sign in here with your email and password."
