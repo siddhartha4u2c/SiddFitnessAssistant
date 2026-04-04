@@ -38,6 +38,14 @@ def send_password_reset_email(
     if not (user and password and sender):
         raise RuntimeError("SMTP is not fully configured in the environment.")
 
+    # Common typo: smtp.gmail.co (invalid) vs smtp.gmail.com
+    _sl = server.lower().rstrip("/")
+    if _sl.endswith("gmail.co") and not _sl.endswith("gmail.com"):
+        raise RuntimeError(
+            f"SMTP_SERVER is {server!r}, which is not a real host—usually a typo. "
+            f"For Gmail set SMTP_SERVER=smtp.gmail.com (note the **.com**) in your .env file."
+        )
+
     subject = "Password reset — SID Fitness Assistant"
     name_part = f" for account ({username_hint})" if username_hint else ""
     body = f"""Hello,
