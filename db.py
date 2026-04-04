@@ -13,6 +13,8 @@ from typing import Any, Iterator
 
 from passlib.hash import bcrypt
 
+import phone_auth
+
 _LOGIN_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", re.IGNORECASE)
 
 APP_DIR = Path(__file__).resolve().parent
@@ -128,6 +130,41 @@ def init_db() -> None:
             """
         )
         _ensure_profile_columns(conn)
+        _ensure_user_columns(conn)
+        _ensure_phone_otp_table(conn)
+
+
+def _ensure_user_columns(conn: sqlite3.Connection) -> None:
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "google_sub" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub "
+            "ON users(google_sub) WHERE google_sub IS NOT NULL"
+        )
+    if "phone_e164" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN phone_e164 TEXT")
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_e164 "
+            "ON users(phone_e164) WHERE phone_e164 IS NOT NULL "
+            "AND length(trim(phone_e164)) > 0"
+        )
+
+
+def _ensure_phone_otp_table(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS phone_otp_challenges (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            phone_e164 TEXT NOT NULL,
+            code_hash TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_phone_otp_phone_time
+            ON phone_otp_challenges(phone_e164, created_at DESC);
+        """
+    )
 
 
 def _ensure_profile_columns(conn: sqlite3.Connection) -> None:
@@ -168,8 +205,10 @@ def is_valid_login_email(email: str) -> bool:
     return bool(_LOGIN_EMAIL_RE.match(email.strip()))
 
 
-def create_user(login_email: str, password: str) -> tuple[bool, str]:
-    """Register; login_email is stored in users.username (legacy column name)."""
+def create_user(
+    login_email: str, password: str, *, phone_raw: str | None = None
+) -> tuple[bool, str]:
+    """Register; login_email is stored in users.username. Optional unique phone_e164."""
     login_email = normalize_login_email(login_email)
     if not login_email:
         return False, "Please enter your email address."
@@ -177,16 +216,58 @@ def create_user(login_email: str, password: str) -> tuple[bool, str]:
         return False, "Please enter a valid email address."
     if len(password) < 6:
         return False, "Password must be at least 6 characters."
+    phone_e164: str | None = None
+    if phone_raw and str(phone_raw).strip():
+        phone_e164 = phone_auth.normalize_phone_e164(phone_raw)
+        if not phone_e164:
+            return False, "Please enter a valid mobile number (with country code if needed)."
+        if get_user_id_by_phone_e164(phone_e164) is not None:
+            return False, "That phone number is already registered."
     ph = bcrypt.hash(password)
     try:
         with get_conn() as conn:
             conn.execute(
-                "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
-                (login_email, ph, _utc_now_iso()),
+                "INSERT INTO users (username, password_hash, phone_e164, created_at) VALUES (?, ?, ?, ?)",
+                (login_email, ph, phone_e164, _utc_now_iso()),
             )
         return True, "Account created. You can sign in."
     except sqlite3.IntegrityError:
-        return False, "That email is already registered."
+        return False, "That email or phone number is already registered."
+
+
+def create_user_phone(phone_raw: str, password: str) -> tuple[bool, str]:
+    """Register with mobile + password; username is a synthetic placeholder until email is added."""
+    e164 = phone_auth.normalize_phone_e164(phone_raw)
+    if not e164:
+        return False, "Please enter a valid mobile number (with country code if needed)."
+    if len(password) < 6:
+        return False, "Password must be at least 6 characters."
+    if get_user_id_by_phone_e164(e164) is not None:
+        return False, "That phone number is already registered."
+    uname = phone_auth.synthetic_username_from_e164(e164)
+    ph = bcrypt.hash(password)
+    try:
+        with get_conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO users (username, password_hash, phone_e164, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (uname, ph, e164, _utc_now_iso()),
+            )
+        return True, "Account created. Sign in with your mobile number and password or OTP."
+    except sqlite3.IntegrityError:
+        return False, "Could not create account (try a different number)."
+
+
+def get_user_id_by_phone_e164(e164: str) -> int | None:
+    if not (e164 or "").strip():
+        return None
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id FROM users WHERE phone_e164 = ?", (e164.strip(),)
+        ).fetchone()
+    return int(row["id"]) if row else None
 
 
 def verify_user(login_email: str, password: str) -> int | None:
@@ -201,6 +282,199 @@ def verify_user(login_email: str, password: str) -> int | None:
     if not bcrypt.verify(_bcrypt_secret(password), row["password_hash"]):
         return None
     return int(row["id"])
+
+
+def verify_user_identifier(login: str, password: str) -> int | None:
+    """Sign in with email+password or mobile+password."""
+    s = (login or "").strip()
+    if not s:
+        return None
+    if "@" in s:
+        return verify_user(s, password)
+    e164 = phone_auth.normalize_phone_e164(s)
+    if not e164:
+        return None
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, password_hash FROM users WHERE phone_e164 = ?", (e164,)
+        ).fetchone()
+    if row is None:
+        return None
+    if not bcrypt.verify(_bcrypt_secret(password), row["password_hash"]):
+        return None
+    return int(row["id"])
+
+
+def create_phone_otp_challenge(phone_e164: str) -> str:
+    """Return plain 6-digit code; store hash until used or expiry."""
+    plain = f"{secrets.randbelow(900000) + 100000:06d}"
+    h = hashlib.sha256(plain.encode()).hexdigest()
+    exp = datetime.now(timezone.utc) + timedelta(minutes=10)
+    exp_s = exp.replace(microsecond=0).isoformat()
+    with get_conn() as conn:
+        conn.execute("DELETE FROM phone_otp_challenges WHERE phone_e164 = ?", (phone_e164,))
+        conn.execute(
+            """
+            INSERT INTO phone_otp_challenges (phone_e164, code_hash, expires_at, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (phone_e164, h, exp_s, _utc_now_iso()),
+        )
+    return plain
+
+
+def verify_phone_otp_and_get_user_id(phone_e164: str, code_plain: str) -> int | None:
+    code_plain = (code_plain or "").strip()
+    if len(code_plain) < 4:
+        return None
+    h = hashlib.sha256(code_plain.encode()).hexdigest()
+    now = _utc_now_iso()
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT id FROM phone_otp_challenges
+            WHERE phone_e164 = ? AND code_hash = ? AND expires_at > ?
+            ORDER BY created_at DESC LIMIT 1
+            """,
+            (phone_e164, h, now),
+        ).fetchone()
+        if row is None:
+            return None
+        conn.execute("DELETE FROM phone_otp_challenges WHERE id = ?", (int(row["id"]),))
+    return get_user_id_by_phone_e164(phone_e164)
+
+
+def update_user_login_email(user_id: int, new_email: str) -> tuple[bool, str]:
+    """Set real sign-in email (e.g. phone-first user adds Gmail)."""
+    new_email = normalize_login_email(new_email)
+    if not new_email:
+        return False, "Enter an email address."
+    if not is_valid_login_email(new_email):
+        return False, "Please enter a valid email address."
+    try:
+        with get_conn() as conn:
+            conn.execute(
+                "UPDATE users SET username = ? WHERE id = ?",
+                (new_email, user_id),
+            )
+    except sqlite3.IntegrityError:
+        return False, "That email is already in use."
+    upsert_profile(user_id, {"email": new_email})
+    return True, ""
+
+
+def set_user_phone_e164(user_id: int, phone_raw: str | None) -> tuple[bool, str]:
+    """Update mobile on file; must stay unique. Empty clears if allowed."""
+    raw = (phone_raw or "").strip()
+    if not raw:
+        un = get_username(user_id)
+        if phone_auth.is_placeholder_login_username(un or ""):
+            return (
+                False,
+                "Add a sign-in email in your profile before removing your mobile number.",
+            )
+        with get_conn() as conn:
+            conn.execute("UPDATE users SET phone_e164 = NULL WHERE id = ?", (user_id,))
+        return True, ""
+    e164 = phone_auth.normalize_phone_e164(raw)
+    if not e164:
+        return False, "Invalid phone number format."
+    other = get_user_id_by_phone_e164(e164)
+    if other is not None and other != user_id:
+        return False, "That phone number is already used by another account."
+    try:
+        with get_conn() as conn:
+            conn.execute(
+                "UPDATE users SET phone_e164 = ? WHERE id = ?",
+                (e164, user_id),
+            )
+    except sqlite3.IntegrityError:
+        return False, "That phone number is already in use."
+    return True, ""
+
+
+def get_user_phone_e164(user_id: int) -> str | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT phone_e164 FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+    if row is None or row["phone_e164"] is None:
+        return None
+    s = str(row["phone_e164"]).strip()
+    return s if s else None
+
+
+def display_login_email_for_profile(user_id: int) -> str:
+    """Empty when account is phone-placeholder (user should add real email)."""
+    u = get_username(user_id)
+    if not u:
+        return ""
+    if phone_auth.is_placeholder_login_username(u):
+        return ""
+    return u
+
+
+def is_phone_placeholder_account(user_id: int) -> bool:
+    return phone_auth.is_placeholder_login_username(get_username(user_id))
+
+
+def sign_in_or_register_google(
+    *, email: str, google_sub: str, full_name: str | None
+) -> tuple[int | None, str | None]:
+    """Find or create user from Google OIDC. Links google_sub to an existing email if unlinked."""
+    email = normalize_login_email(email)
+    if not is_valid_login_email(email):
+        return None, "Google did not return a valid email address."
+    gsub = (google_sub or "").strip()
+    if not gsub:
+        return None, "Invalid Google account identifier."
+
+    unusable_pw_hash = bcrypt.hash(_bcrypt_secret(secrets.token_urlsafe(48)))
+    fn = (full_name or "").strip()
+
+    try:
+        with get_conn() as conn:
+            row = conn.execute(
+                "SELECT id FROM users WHERE google_sub = ?", (gsub,)
+            ).fetchone()
+            if row:
+                uid = int(row["id"])
+            else:
+                row = conn.execute(
+                    "SELECT id, google_sub FROM users WHERE username = ? COLLATE NOCASE",
+                    (email,),
+                ).fetchone()
+                if row:
+                    prev = row["google_sub"]
+                    if (
+                        prev
+                        and str(prev).strip()
+                        and str(prev).strip() != gsub
+                    ):
+                        return None, "This email is already linked to a different Google account."
+                    conn.execute(
+                        "UPDATE users SET google_sub = ? WHERE id = ?",
+                        (gsub, int(row["id"])),
+                    )
+                    uid = int(row["id"])
+                else:
+                    cur = conn.execute(
+                        """
+                        INSERT INTO users (username, password_hash, google_sub, created_at)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                        (email, unusable_pw_hash, gsub, _utc_now_iso()),
+                    )
+                    uid = int(cur.lastrowid)
+    except sqlite3.IntegrityError:
+        return None, "Could not link your Google account (conflict)."
+
+    p = get_profile(uid)
+    fields: dict[str, Any] = {"email": email}
+    if fn and not (p.get("full_name") or "").strip():
+        fields["full_name"] = fn
+    upsert_profile(uid, fields)
+    return uid, None
 
 
 def get_username(user_id: int) -> str | None:
@@ -249,24 +523,26 @@ def get_profile_email(user_id: int) -> str | None:
 
 
 def get_delivery_email(user_id: int) -> str | None:
-    """Where to send password reset: profile email if set, otherwise sign-in email."""
-    pe = get_profile_email(user_id)
-    if pe:
-        return pe.strip()
+    """Password reset inbox: real sign-in email, else profile email (not phone-placeholder username)."""
     login = get_username(user_id)
-    if login and "@" in login:
+    if login and "@" in login and not phone_auth.is_placeholder_login_username(login):
         return login.strip()
-    return None
+    pe = get_profile_email(user_id)
+    return pe.strip() if pe else None
 
 
 def resolve_user_for_password_reset(identifier: str) -> tuple[int | None, str | None]:
-    """Match sign-in email or profile email; return destination inbox for the reset link."""
+    """Match sign-in email, profile email, or mobile; reset only if we have an email destination."""
     raw = identifier.strip()
     if not raw:
         return None, None
     uid = get_user_id_by_login_email(raw)
     if uid is None:
         uid = get_user_id_by_profile_email(raw)
+    if uid is None:
+        e164 = phone_auth.normalize_phone_e164(raw)
+        if e164:
+            uid = get_user_id_by_phone_e164(e164)
     if uid is None:
         return None, None
     dest = get_delivery_email(uid)
@@ -339,9 +615,17 @@ def get_profile(user_id: int) -> dict[str, Any]:
         row = conn.execute(
             "SELECT * FROM profiles WHERE user_id = ?", (user_id,)
         ).fetchone()
-    if row is None:
-        return {}
-    return dict(row)
+        urow = conn.execute(
+            "SELECT phone_e164 FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+    d: dict[str, Any] = dict(row) if row else {}
+    if urow and urow["phone_e164"]:
+        pe = str(urow["phone_e164"]).strip()
+        if pe:
+            d["phone_e164"] = pe
+    if "phone_e164" not in d:
+        d["phone_e164"] = None
+    return d
 
 
 def upsert_profile(user_id: int, fields: dict[str, Any]) -> None:
