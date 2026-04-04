@@ -65,6 +65,8 @@ def _send_via_resend(to_address: str, subject: str, body: str) -> None:
         headers={
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
+            # Resend returns HTTP 403 / error 1010 if User-Agent is missing (urllib omits it by default).
+            "User-Agent": "SID-Fitness-Assistant/1.0 (python-urllib; transactional-email)",
         },
         method="POST",
     )
