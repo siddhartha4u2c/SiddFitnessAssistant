@@ -40,8 +40,13 @@ def _compact_ui_css() -> str:
     return """
 <style>
     @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
-    html, body, [class*="st"] {
-        font-family: "Inter", "Segoe UI", system-ui, sans-serif !important;
+    /* Inter for UI text only — never force it on all [class*="st"] or Streamlit's Material
+       icon ligatures break (e.g. _arrow_right on expanders, garbled file upload labels). */
+    html, body {
+        font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    }
+    .stApp {
+        font-family: "Inter", "Segoe UI", system-ui, sans-serif;
     }
     div[data-testid="stButton"] button,
     div[data-testid="stFormSubmitButton"] button {
@@ -161,13 +166,15 @@ def _guest_auth_theme_css() -> str:
         opacity: 0.5;
     }
     .sid-guest-auth .main .block-container > div > div[data-testid="stHorizontalBlock"]:first-of-type > div[data-testid="column"]:nth-child(2) {
-        background: #ffffff !important;
+        background: linear-gradient(165deg, rgba(30, 41, 59, 0.96) 0%, rgba(15, 23, 42, 0.99) 100%) !important;
         border-radius: 20px !important;
         padding: 1.35rem 1.5rem 1.75rem !important;
         box-shadow:
-            0 4px 6px -1px rgba(15, 23, 42, 0.08),
-            0 24px 48px -12px rgba(15, 23, 42, 0.18) !important;
-        border: 1px solid rgba(226, 232, 240, 0.9) !important;
+            0 4px 6px -1px rgba(0, 0, 0, 0.28),
+            0 24px 48px -12px rgba(0, 0, 0, 0.42) !important;
+        border: 1px solid rgba(148, 163, 184, 0.22) !important;
+        color-scheme: dark !important;
+        color: #f1f5f9 !important;
     }
     .sid-auth-hero {
         position: relative;
@@ -270,16 +277,36 @@ def _guest_auth_theme_css() -> str:
         color: #64748b;
         line-height: 1.45;
     }
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .sid-auth-form-heading h2 {
+        color: #f8fafc !important;
+    }
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .sid-auth-form-heading p {
+        color: #cbd5e1 !important;
+    }
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stWidgetLabel"] p,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stWidgetLabel"] label {
+        color: #f8fafc !important;
+    }
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stCaption"],
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .stCaption {
+        color: #94a3b8 !important;
+    }
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .stMarkdown,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .stMarkdown p {
+        color: #e2e8f0 !important;
+    }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .stMarkdown a {
-        color: #2563eb !important;
+        color: #7dd3fc !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-baseweb="input"] {
         border-radius: 10px !important;
-        border-color: #e2e8f0 !important;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+        border-color: rgba(148, 163, 184, 0.35) !important;
+        background: rgba(15, 23, 42, 0.65) !important;
+        color: #f8fafc !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .stTabs [data-baseweb="tab-list"] {
-        background: #f1f5f9 !important;
+        background: rgba(15, 23, 42, 0.55) !important;
         border-radius: 12px !important;
         padding: 4px !important;
         gap: 4px !important;
@@ -287,11 +314,12 @@ def _guest_auth_theme_css() -> str:
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .stTabs [data-baseweb="tab"] {
         border-radius: 10px !important;
         font-weight: 600 !important;
+        color: #94a3b8 !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .stTabs [aria-selected="true"] {
-        background: #ffffff !important;
-        color: #0f172a !important;
-        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08) !important;
+        background: rgba(51, 65, 85, 0.95) !important;
+        color: #f8fafc !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25) !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stButton"] button[kind="primary"],
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stButton"] button[data-testid="baseButton-primary"] {
@@ -308,15 +336,15 @@ def _guest_auth_theme_css() -> str:
         box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4) !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stButton"] button[kind="secondary"] {
-        background: #ffffff !important;
-        border: 1px solid #e2e8f0 !important;
-        color: #334155 !important;
+        background: rgba(30, 41, 59, 0.85) !important;
+        border: 1px solid rgba(148, 163, 184, 0.35) !important;
+        color: #e2e8f0 !important;
         font-weight: 600 !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stExpander"] {
-        border: 1px solid #e2e8f0 !important;
+        border: 1px solid rgba(148, 163, 184, 0.22) !important;
         border-radius: 12px !important;
-        background: #f8fafc !important;
+        background: rgba(15, 23, 42, 0.45) !important;
     }
     .sid-guest-auth .sid-auth-preview-title {
         font-size: 1.05rem;
@@ -483,12 +511,19 @@ or what to eat to reach a fitness goal:
   protein and fiber for satiety; muscle gain: adequate protein and energy; maintenance: balance around
   maintenance calories). If **ENERGY CONTEXT** below includes saved BMR/TDEE, treat those as rough
   guides only and state assumptions; if missing, infer sensible ranges from goal and profile.
-- Respect **diet pattern**, allergies, foods to avoid, health notes, and meal timing from the profile.
+- Respect **diet pattern** strictly: if **Vegetarian**, no meat/fish/poultry—eggs/dairy allowed unless notes say otherwise; if the user says vegetarian **and eats eggs**, centre **lacto-ovo**-style proteins. Apply **Vegan** / **Pescatarian** / other pattern the same way. Use **coach notes** and **meal timing** text for nuances (e.g. eggs OK, no dairy).
+- Respect allergies, foods to avoid, health notes, and meal timing from the profile.
 - Structure the answer clearly (e.g. by day or by meal) with portion cues and approximate calories per
   day or meal when reasonable. Offer regional swaps if an item may be hard to find.
 - If country or goal is unclear, ask briefly or offer a default and label it as such. Never prescribe
   clinical therapeutic diets.
 - **Never recommend beef** (steak, ground beef, beef dishes, beef broth/stock, etc.) in meal ideas or swaps; use other proteins instead.
+
+GOAL TIMELINE & PROGRESS: A **GOAL TIMELINE** section lists dated moments when the user changed **Primary nutrition goal** in their profile or sent a **goal-related message** in this chat. Each row may include a **weight/height snapshot** captured at that moment. Use it together with **WEIGHT HISTORY** and **WEIGHT TREND** to:
+- Summarise how long they have been pursuing the current (or a past) goal and what changed over that **period**.
+- Compare logged weight change (or stability) to a **rough, non-clinical** sense of whether the pace looks **modest, fast, slow, or stalled** for their stated goal—use careful wording (e.g. "on the quick side," "quite gradual," "roughly in line with many sustainable plans") and never claim medical certainty.
+- If progress seems **higher or lower than might be expected** given the timeline and logs, say so kindly and offer one practical adjustment (food, training, sleep, consistency, or expectations)—or acknowledge solid progress when it fits.
+- Do **not** invent dates, weights, or events that are not in the timeline or weight log.
 
 If information is missing, say what would help. Reference weight trends only when the log supports it.
 Keep replies readable; use more detail when the user requests full-day or multi-day plans."""
@@ -610,6 +645,42 @@ def weight_trend_summary(rows: list) -> str:
     )
 
 
+def format_goal_timeline(events: list) -> str:
+    """Readable block for the coach from ``db.list_goal_tracking_events``."""
+    if not events:
+        return (
+            "(No dated goal events yet. A row is added when the user **changes Primary nutrition goal** "
+            "in their profile and saved, or when they mention goals in coach chat—e.g. targets, timelines, "
+            "lose/gain weight.)"
+        )
+    lines: list[str] = []
+    for ev in events:
+        ts = (ev.get("recorded_at") or "")[:19].replace("T", " ")
+        src = (ev.get("source") or "").strip()
+        pg = (ev.get("primary_goal_at_time") or "").strip() or "—"
+        bw = ev.get("body_weight_kg")
+        hf = ev.get("height_feet")
+        snap_parts: list[str] = []
+        if bw is not None:
+            try:
+                snap_parts.append(f"weight ~{float(bw):.2f} kg")
+            except (TypeError, ValueError):
+                pass
+        if hf is not None:
+            try:
+                snap_parts.append(f"height ~{float(hf):.2f} ft")
+            except (TypeError, ValueError):
+                pass
+        snap = f" Snapshot: {', '.join(snap_parts)}." if snap_parts else ""
+        cnx = (ev.get("coach_notes_excerpt") or "").strip()
+        cn_line = f" Coach notes (excerpt): {cnx[:280]}{'…' if len(cnx) > 280 else ''}" if cnx else ""
+        det = (ev.get("detail") or "").strip()
+        lines.append(
+            f"- [{ts} UTC] source={src} | profile goal at event: **{pg}**{snap}{cn_line}\n  {det}"
+        )
+    return "\n".join(lines)
+
+
 def format_meal_log(rows: list) -> str:
     if not rows:
         return "(No saved meals yet.)"
@@ -637,9 +708,34 @@ def energy_context_from_weights(rows: list) -> str:
     )
 
 
-def build_coach_prompt(user_id: int, user_question: str) -> str:
+def _coach_image_mime(raw: str | None) -> str:
+    m = (raw or "").strip().lower()
+    if m in ("image/png", "image/x-png"):
+        return "image/png"
+    return "image/jpeg"
+
+
+def _coach_progress_photo_instructions() -> str:
+    return """
+=== PROGRESS PHOTO (image attached to this request) ===
+The user attached a **current body / progress photograph**. You receive it as pixels (not summarized in text).
+
+How to respond:
+- Be **warm and non-judgmental**; never shame appearance or tie worth to body shape.
+- Give **cautious, approximate** impressions only: lighting, angle, pose, clothing, and camera distance make photos unreliable for true body composition. Do **not** claim exact body fat percentage, medical diagnosis, or definitive proof that a goal is fully "achieved."
+- Use **primary goal**, **GOAL TIMELINE**, and **WEIGHT HISTORY** together: say whether progress **seems broadly consistent** with their goal when the visual and logs align, or say the picture alone is **inconclusive** and invite better data.
+- If you cannot judge direction from the photo, or to sharpen the assessment, ask **1–3 concrete questions** (e.g. current scale weight, waist or how clothes fit, training frequency, weeks since last check-in photo).
+- Prefer **habits and next steps** over appearance critique; celebrate effort where it fits.
+
+"""
+
+
+def build_coach_prompt(
+    user_id: int, user_question: str, *, body_photo_attached: bool = False
+) -> str:
     p = db.get_profile(user_id)
     weights = db.list_weight_entries(user_id, 30)
+    goal_events = db.list_goal_tracking_events(user_id, 40)
     meals = db.list_meal_entries(user_id, 8)
     history = db.list_chat_messages(user_id, 24)
     hist_lines = []
@@ -680,6 +776,9 @@ def build_coach_prompt(user_id: int, user_question: str) -> str:
 === WEIGHT TREND (from saved entries) ===
 {weight_trend_summary(weights)}
 
+=== GOAL TIMELINE (dated goal changes & goal-related chat; use with weight log for progress over time) ===
+{format_goal_timeline(goal_events)}
+
 === RECENT SAVED MEALS ===
 {format_meal_log(meals)}
 
@@ -688,7 +787,7 @@ def build_coach_prompt(user_id: int, user_question: str) -> str:
 
 === LATEST MEAL ANALYSIS (current session; may be unsaved) ===
 {last_meal if last_meal.strip() else "(None in this session yet.)"}
-
+{_coach_progress_photo_instructions() if body_photo_attached else ""}
 ---
 The user's new question:
 {user_question}
@@ -714,8 +813,9 @@ User-provided profile context (respect preferences; flag possible allergy confli
 4. Break down calories per item
 5. Add the **Recommendation** section from the output format: judge in general terms whether items are
    relatively nutritious or better as occasional choices; align advice with the user's **Primary goal**,
-   diet pattern, allergies, and foods to avoid from the profile. Be supportive and non-judgmental;
-   avoid moralizing about food. This is general information only, not medical advice.
+   diet pattern, allergies, and foods to avoid from the profile. If **Vegetarian**, do not suggest meat or fish;
+   if notes say vegetarian **with eggs** (or similar), eggs and dairy are acceptable in suggestions unless excluded elsewhere.
+   Be supportive and non-judgmental; avoid moralizing about food. This is general information only, not medical advice.
 6. Do not suggest **beef** or beef-based foods as improvements or alternatives.
 """
     if has_image and has_text:
@@ -807,6 +907,58 @@ def estimate_tdee_from_profile(
         return None, None
 
 
+def _weekly_plan_diet_constraint_lines(p: dict) -> list[str]:
+    """Hard rules injected into weekly plan nutrition instructions (matches profile diet_pattern)."""
+    dp = (p.get("diet_pattern") or "").strip()
+    if dp == "Omnivore":
+        dp = "Non vegetarian"
+    nuance = workout_plan.diet_nuance_blob_from_profile(p)
+    out: list[str] = []
+
+    if dp == "Vegetarian":
+        out.append(
+            "**Mandatory — Vegetarian:** Every breakfast, lunch, and dinner must be **fully vegetarian**: "
+            "no meat, poultry, fish, shellfish, or other animal flesh. **Eggs and dairy are allowed** unless "
+            "the profile or notes explicitly rule them out (e.g. vegan, no eggs, plant-based only). If the user "
+            "states they are vegetarian **and still eat eggs** (or similar), treat as **lacto-ovo vegetarian**: "
+            "use eggs and dairy as primary proteins where appropriate and reflect that in meal wording."
+        )
+    elif dp == "Vegan":
+        out.append(
+            "**Mandatory — Vegan:** No animal products of any kind—no meat, fish, poultry, dairy, eggs, or honey. "
+            "Use legumes, tofu, tempeh, nuts, seeds, and plant-based alternatives only."
+        )
+    elif dp == "Pescatarian":
+        out.append(
+            "**Mandatory — Pescatarian:** Fish and seafood are allowed; **no poultry or red meat**. "
+            "Eggs and dairy follow the profile and notes."
+        )
+    elif dp == "Flexitarian":
+        out.append(
+            "**Flexitarian:** Emphasize plant-forward meals; use fish or small amounts of animal protein only when "
+            "consistent with the user's notes—not as the default every day unless their request says otherwise."
+        )
+    elif dp == "Other / mixed":
+        out.append(
+            "**Diet pattern — Other / mixed:** Follow every dietary detail in the profile summary and in the "
+            "**User-stated dietary detail** line below; when instructions conflict, use the stricter or more "
+            "specific user wording."
+        )
+    elif dp in ("Non vegetarian", ""):
+        pass
+    else:
+        out.append(
+            f"**Diet pattern ({dp}):** Align all meals with this pattern and with the user notes below."
+        )
+
+    if nuance:
+        out.append(
+            "**User-stated dietary detail (honour in every meal line, including protein choices and swaps):** "
+            + nuance
+        )
+    return out
+
+
 def build_week_plan_nutrition_block(p: dict, weight_rows: list) -> str:
     """TDEE anchor + goal-based calorie rules for the weekly meal section of the plan."""
     lines: list[str] = []
@@ -871,8 +1023,9 @@ def build_week_plan_nutrition_block(p: dict, weight_rows: list) -> str:
             "**Primary goal not set:** Use balanced meals; if TDEE is known, keep days near maintenance unless the user request implies otherwise."
         )
 
+    lines.extend(_weekly_plan_diet_constraint_lines(p))
     lines.append(
-        "Obey profile **diet pattern**, **allergy alerts**, and **foods to avoid** in every breakfast, lunch, and dinner."
+        "Obey **allergy alerts** and **foods to avoid** in every breakfast, lunch, and dinner."
     )
     lines.append(
         "**No beef:** Do not include beef, steak, ground beef, or beef-based broths/stocks/proteins in any meal suggestion."
@@ -1484,6 +1637,14 @@ def render_main_content() -> None:
                                 "coach_notes": coach_notes.strip(),
                             },
                         )
+                        db.record_profile_primary_goal_change(
+                            uid,
+                            prof.get("primary_goal"),
+                            primary_goal,
+                            body_weight_kg=float(body_weight_kg),
+                            height_feet=float(height_feet),
+                            coach_notes=coach_notes.strip(),
+                        )
                         st.success("Profile saved.")
                         st.rerun()
 
@@ -1566,7 +1727,32 @@ def render_main_content() -> None:
                                 "images are prompt-based without your photo."
                             )
                         img_model = workout_plan.default_image_model()
-                        gender_p = (db.get_profile(uid).get("gender") or "").strip()
+                        _p_img = db.get_profile(uid)
+                        gender_p = (_p_img.get("gender") or "").strip()
+                        _wk_float: float | None = None
+                        _raw_wk = _p_img.get("body_weight_kg")
+                        if _raw_wk is not None:
+                            try:
+                                _wf = float(_raw_wk)
+                                if _wf > 0:
+                                    _wk_float = _wf
+                            except (TypeError, ValueError):
+                                pass
+                        if _wk_float is None:
+                            for _wr in _weights:
+                                try:
+                                    _wf = float(_wr["weight_kg"])
+                                    if _wf > 0:
+                                        _wk_float = _wf
+                                        break
+                                except (TypeError, ValueError, KeyError):
+                                    continue
+                        _hf_img = _p_img.get("height_feet")
+                        _physique = workout_plan.physique_descriptor_from_profile(
+                            _hf_img,
+                            _wk_float,
+                            gender_p,
+                        )
                         imgs: dict[int, bytes] = {}
                         errs: dict[int, str] = {}
                         bar = st.progress(0.0, text="Generating your personalised plan…")
@@ -1583,6 +1769,7 @@ def render_main_content() -> None:
                                 base_url=img_base,
                                 fallback_api_key=img_key_fallback,
                                 fallback_base_url=img_fb_base,
+                                physique_descriptor=_physique,
                             )
                             if b:
                                 imgs[dn] = b
@@ -1717,17 +1904,103 @@ def render_main_content() -> None:
             key="toggle_coach_chat",
         )
         if show_coach:
+            st.markdown("##### Progress photo for coach")
+            st.caption(
+                "Optional: upload a **current body / progress** picture so the coach can comment in context of "
+                "your goal, goal timeline, and weight log. Photos are only a rough guide—lighting and angle matter; "
+                "use your scale log for hard numbers. Not medical advice."
+            )
+            _cup = int(st.session_state.get("coach_progress_uploader_key", 0))
+            prog_up = st.file_uploader(
+                "Upload progress / body photo",
+                type=["jpg", "jpeg", "png"],
+                key=f"coach_progress_upload_{_cup}",
+            )
+            coach_photo_note = st.text_input(
+                "Optional note for the coach (pose, lighting, how long since last photo, etc.)",
+                key="coach_progress_photo_note",
+            )
+            attach_photo_to_next = st.checkbox(
+                "Include this photo with my next message in the chat below",
+                key="coach_attach_photo_next_msg",
+            )
+            _coach_review_default_q = (
+                "Please review my progress photo together with my profile goal, goal timeline, and weight log. "
+                "From what you can see (knowing photos are imperfect), does it seem I'm moving in a reasonable "
+                "direction for my goal—or is that unclear? If you need more to judge, ask for current scale weight, "
+                "a measurement, or training consistency."
+            )
+            if st.button(
+                "Ask coach to review this photo",
+                key="btn_coach_review_photo",
+                use_container_width=True,
+                type="secondary",
+            ):
+                if prog_up is None:
+                    st.warning("Choose a photo first.")
+                else:
+                    b = prog_up.getvalue()
+                    mime = _coach_image_mime(getattr(prog_up, "type", None))
+                    note = (coach_photo_note or "").strip()
+                    full_q = (
+                        f"{note}\n\n{_coach_review_default_q}" if note else _coach_review_default_q
+                    )
+                    db.record_chat_goal_mention_if_relevant(uid, full_q)
+                    coach_prompt = build_coach_prompt(
+                        uid, full_q, body_photo_attached=True
+                    )
+                    answer = ""
+                    try:
+                        with st.spinner("Coach is reviewing your photo…"):
+                            coach_resp = model.generate_content(
+                                coach_prompt,
+                                image_bytes=b,
+                                image_mime=mime,
+                            )
+                        try:
+                            answer = (coach_resp.text or "").strip()
+                        except ValueError:
+                            answer = ""
+                    except Exception as exc:
+                        answer = (
+                            "Sorry, the coach request failed (network, quota, API, or this model may not support "
+                            f"images). Details: {exc}"
+                        )
+                    if not answer:
+                        answer = (
+                            "No text response (content may have been blocked or the model returned no text)."
+                        )
+                    user_line = "📷 Progress photo — coach review."
+                    if note:
+                        user_line += f"\nNote: {note}"
+                    db.add_chat_message(uid, "user", user_line)
+                    db.add_chat_message(uid, "assistant", answer)
+                    st.session_state["coach_progress_uploader_key"] = _cup + 1
+                    st.rerun()
+
             msgs = db.list_chat_messages(uid, 40)
             for m in msgs:
                 with st.chat_message("user" if m["role"] == "user" else "assistant"):
                     st.write(m["content"])
-    
+
             if coach_q := st.chat_input("Ask the coach…"):
-                coach_prompt = build_coach_prompt(uid, coach_q)
+                img_bytes: bytes | None = None
+                img_mime = "image/jpeg"
+                if prog_up is not None and attach_photo_to_next:
+                    img_bytes = prog_up.getvalue()
+                    img_mime = _coach_image_mime(getattr(prog_up, "type", None))
+                db.record_chat_goal_mention_if_relevant(uid, coach_q)
+                coach_prompt = build_coach_prompt(
+                    uid, coach_q, body_photo_attached=img_bytes is not None
+                )
                 answer = ""
                 try:
                     with st.spinner("Coach is thinking…"):
-                        coach_resp = model.generate_content(coach_prompt)
+                        coach_resp = model.generate_content(
+                            coach_prompt,
+                            image_bytes=img_bytes,
+                            image_mime=img_mime,
+                        )
                     try:
                         answer = (coach_resp.text or "").strip()
                     except ValueError:
@@ -1739,8 +2012,13 @@ def render_main_content() -> None:
                     )
                 if not answer:
                     answer = "No text response (content may have been blocked)."
-                db.add_chat_message(uid, "user", coach_q)
+                user_chat_line = (
+                    f"📷 [Photo attached] {coach_q}" if img_bytes else coach_q
+                )
+                db.add_chat_message(uid, "user", user_chat_line)
                 db.add_chat_message(uid, "assistant", answer)
+                if img_bytes is not None and attach_photo_to_next:
+                    st.session_state["coach_progress_uploader_key"] = _cup + 1
                 st.rerun()
     
         st.divider()
@@ -1918,38 +2196,151 @@ else:
             "<p>Sign in or register to open your dashboard, logs, and AI coach.</p></div>",
             unsafe_allow_html=True,
         )
-        tab_in, tab_reg, tab_reg_phone = st.tabs(
-            ["Sign in", "Register (email)", "Register (phone)"]
-        )
+        tab_in, tab_reg = st.tabs(["Sign in", "Register"])
         with tab_in:
             import google_oauth as g
 
             _g_err = st.session_state.pop("google_oauth_flash_error", None)
             if _g_err:
                 st.error(_g_err)
+
+            sign_mode = st.radio(
+                "Sign in with",
+                ["Password", "One-time code (email or SMS)"],
+                horizontal=True,
+                key="signin_method",
+            )
+
             lu = st.text_input(
                 "Email or mobile number",
                 key="login_user",
                 autocomplete="username",
                 placeholder="you@example.com or +91 98765 43210",
             )
-            lp = st.text_input(
-                "Password", type="password", key="login_pass", autocomplete="current-password"
-            )
-            st.markdown(
-                '<p style="text-align:right;font-size:0.8rem;margin:-0.5rem 0 0.5rem 0;">'
-                '<span style="color:#64748b;">Forgot password?</span> '
-                '<span style="color:#2563eb;font-weight:600;">Use the section below</span></p>',
-                unsafe_allow_html=True,
-            )
-            if st.button("Sign in", use_container_width=True, key="btn_signin", type="primary"):
-                found = db.verify_user_identifier(lu, lp)
-                if found:
-                    st.session_state.user_id = found
-                    st.session_state.username = db.get_username(found)
-                    st.rerun()
-                else:
-                    st.error("Invalid email/mobile or password.")
+
+            if sign_mode.startswith("Password"):
+                lp = st.text_input(
+                    "Password",
+                    type="password",
+                    key="login_pass",
+                    autocomplete="current-password",
+                )
+                st.markdown(
+                    '<p style="text-align:right;font-size:0.8rem;margin:-0.5rem 0 0.5rem 0;">'
+                    '<span style="color:#64748b;">Forgot password?</span> '
+                    '<span style="color:#2563eb;font-weight:600;">Use the section below</span></p>',
+                    unsafe_allow_html=True,
+                )
+                if st.button(
+                    "Sign in", use_container_width=True, key="btn_signin", type="primary"
+                ):
+                    found = db.verify_user_identifier(lu, lp)
+                    if found:
+                        st.session_state.user_id = found
+                        st.session_state.username = db.get_username(found)
+                        st.rerun()
+                    else:
+                        st.error("Invalid email/mobile or password.")
+            else:
+                st.caption(
+                    "We send a **code by email** if you enter your sign-in email, or **by SMS** if you enter "
+                    "your registered mobile number (same as when you registered)."
+                )
+                _email_ok = mailer.smtp_configured()
+                _sms_ok = phone_auth.sms_otp_configured()
+                if not _email_ok and not _sms_ok:
+                    st.warning(
+                        "Email codes need **SMTP** in `.env`; SMS codes need **Twilio**. Configure at least one."
+                    )
+                if st.button("Send code", use_container_width=True, key="btn_otp_send", type="secondary"):
+                    st.session_state.pop("otp_pending", None)
+                    raw_id = (lu or "").strip()
+                    if not raw_id:
+                        st.warning("Enter your email or mobile number first.")
+                    elif "@" in raw_id:
+                        if not _email_ok:
+                            st.error(
+                                "SMTP is not configured. Add SMTP_SERVER, SMTP_PORT, SMTP_USERNAME, "
+                                "SMTP_PASSWORD, and MAIL_DEFAULT_SENDER to `.env` for email codes."
+                            )
+                        else:
+                            plain, err_em = db.create_email_otp_challenge(raw_id)
+                            if err_em or not plain:
+                                st.warning(err_em or "Could not send code.")
+                            else:
+                                try:
+                                    mailer.send_login_otp_email(
+                                        db.normalize_login_email(raw_id), plain
+                                    )
+                                    st.session_state["otp_pending"] = {
+                                        "kind": "email",
+                                        "email": db.normalize_login_email(raw_id),
+                                    }
+                                    st.success("Check your **email** for the code (valid ~10 minutes).")
+                                except Exception as exc:
+                                    st.error(f"Could not send email: {exc}")
+                    else:
+                        if not _sms_ok:
+                            st.error(
+                                "SMS is not configured. Add Twilio keys to `.env`, or sign in with email + code."
+                            )
+                        else:
+                            e164 = phone_auth.normalize_phone_e164(raw_id)
+                            if not e164:
+                                st.warning("Enter a valid mobile number (include country code).")
+                            elif db.get_user_id_by_phone_e164(e164) is None:
+                                st.warning("No account uses this number.")
+                            else:
+                                try:
+                                    plain = db.create_phone_otp_challenge(e164)
+                                    phone_auth.send_otp_sms(e164, plain)
+                                    st.session_state["otp_pending"] = {
+                                        "kind": "phone",
+                                        "e164": e164,
+                                    }
+                                    st.success("Code sent by **SMS**.")
+                                except Exception as exc:
+                                    st.error(f"Could not send SMS: {exc}")
+
+                otp_code = st.text_input(
+                    "6-digit code",
+                    key="otp_login_code",
+                    max_chars=8,
+                )
+                if st.button(
+                    "Verify and sign in",
+                    use_container_width=True,
+                    key="btn_otp_verify",
+                    type="primary",
+                ):
+                    pend = st.session_state.get("otp_pending")
+                    if not pend:
+                        st.warning("Send a code first.")
+                    elif pend.get("kind") == "email":
+                        uid_o = db.verify_email_otp_and_get_user_id(
+                            pend["email"], otp_code
+                        )
+                        if not uid_o:
+                            st.error("Invalid or expired code.")
+                        else:
+                            st.session_state.user_id = uid_o
+                            st.session_state.username = db.get_username(uid_o)
+                            st.session_state.pop("otp_pending", None)
+                            st.rerun()
+                    elif pend.get("kind") == "phone":
+                        uid_o = db.verify_phone_otp_and_get_user_id(
+                            pend["e164"], otp_code
+                        )
+                        if not uid_o:
+                            st.error("Invalid or expired code.")
+                        else:
+                            st.session_state.user_id = uid_o
+                            st.session_state.username = db.get_username(uid_o)
+                            st.session_state.pop("otp_pending", None)
+                            st.rerun()
+                    else:
+                        st.warning("Send a code first.")
+
             st.markdown(
                 '<p style="font-size:0.78rem;margin:0.25rem 0 0.35rem 0;line-height:1.25;'
                 'color:#64748b;">Email reset link</p>',
@@ -1966,7 +2357,7 @@ else:
                 if st.button("Send reset link", use_container_width=False, key="btn_forgot_send"):
                     fid = (lu or "").strip()
                     if not fid:
-                        st.warning("Enter your email in the field above first.")
+                        st.warning("Enter your email or mobile in the field above first.")
                     elif not mailer.smtp_configured():
                         st.error(
                             "SMTP is not configured. Add SMTP_SERVER, SMTP_PORT, SMTP_USERNAME, "
@@ -2016,111 +2407,87 @@ else:
                         _st_oauth
                     )
                     st.rerun()
-            if phone_auth.sms_otp_configured():
-                st.divider()
-                with st.expander("Sign in with SMS code (OTP)", expanded=False):
-                    st.caption("We text a one-time code to your registered mobile number.")
-                    otp_phone = st.text_input(
-                        "Mobile number",
-                        key="otp_login_phone",
-                        placeholder="+91 98765 43210",
-                    )
-                    if st.button("Send code", key="btn_otp_send", type="secondary"):
-                        e164 = phone_auth.normalize_phone_e164(otp_phone)
-                        if not e164:
-                            st.warning("Enter a valid mobile number (include country code).")
-                        elif db.get_user_id_by_phone_e164(e164) is None:
-                            st.warning("No account uses this number.")
-                        else:
-                            try:
-                                plain = db.create_phone_otp_challenge(e164)
-                                phone_auth.send_otp_sms(e164, plain)
-                                st.session_state["otp_login_e164"] = e164
-                                st.success("Code sent. Check your SMS.")
-                            except Exception as exc:
-                                st.error(f"Could not send SMS: {exc}")
-                    otp_code = st.text_input("6-digit code", key="otp_login_code", max_chars=8)
-                    if st.button(
-                        "Verify and sign in", key="btn_otp_verify", type="primary"
-                    ):
-                        e164 = st.session_state.get("otp_login_e164")
-                        if not e164:
-                            st.warning("Send a code first.")
-                        else:
-                            uid_o = db.verify_phone_otp_and_get_user_id(e164, otp_code)
-                            if not uid_o:
-                                st.error("Invalid or expired code.")
-                            else:
-                                st.session_state.user_id = uid_o
-                                st.session_state.username = db.get_username(uid_o)
-                                st.session_state.pop("otp_login_e164", None)
-                                st.rerun()
-            else:
-                st.caption("SMS OTP: add Twilio keys in `.env` to enable **Sign in with SMS code**.")
         with tab_reg:
             import google_oauth as g
 
             if g.is_configured():
-                st.caption("If you prefer Google, use **Sign in with Google** on the **Sign in** tab.")
-            ru = st.text_input(
-                "Email",
-                key="reg_user",
+                st.caption("You can also **Sign in with Google** on the **Sign in** tab.")
+            st.caption(
+                "Create one account: fill **email**, **mobile**, or **both** (and the same password). "
+                "At least one of email or mobile is required."
+            )
+            reg_em = st.text_input(
+                "Email (optional)",
+                key="reg_unified_email",
                 autocomplete="email",
                 placeholder="you@example.com",
             )
-            reg_phone_opt = st.text_input(
-                "Mobile (optional, must be unique)",
-                key="reg_phone_opt",
+            reg_ph = st.text_input(
+                "Mobile (optional)",
+                key="reg_unified_phone",
                 placeholder="+91 98765 43210",
             )
-            rp = st.text_input("Password", type="password", key="reg_pass")
-            rp2 = st.text_input("Confirm password", type="password", key="reg_pass2")
+            rp = st.text_input("Password", type="password", key="reg_unified_pass")
+            rp2 = st.text_input(
+                "Confirm password", type="password", key="reg_unified_pass2"
+            )
             if st.button(
-                "Create account", use_container_width=True, key="btn_reg", type="primary"
+                "Create account", use_container_width=True, key="btn_reg_unified", type="primary"
             ):
                 if rp != rp2:
                     st.error("Passwords do not match.")
                 else:
-                    _praw = (reg_phone_opt or "").strip() or None
-                    ok, msg = db.create_user(ru, rp, phone_raw=_praw)
-                    if ok:
-                        uid_new = db.get_user_id_by_login_email(ru)
-                        if uid_new:
-                            db.upsert_profile(
-                                uid_new,
-                                {"email": db.normalize_login_email(ru)},
+                    em = (reg_em or "").strip()
+                    ph_raw = (reg_ph or "").strip()
+                    if not em and not ph_raw:
+                        st.error("Enter an email and/or a mobile number.")
+                    elif em and ph_raw:
+                        if not db.is_valid_login_email(em):
+                            st.error("Please enter a valid email address.")
+                        else:
+                            e164_try = phone_auth.normalize_phone_e164(ph_raw)
+                            if not e164_try:
+                                st.error(
+                                    "Please enter a valid mobile number (with country code if needed)."
+                                )
+                            else:
+                                ok, msg = db.create_user(em, rp, phone_raw=ph_raw)
+                                if ok:
+                                    uid_new = db.get_user_id_by_login_email(em)
+                                    if uid_new:
+                                        db.upsert_profile(
+                                            uid_new,
+                                            {"email": db.normalize_login_email(em)},
+                                        )
+                                    st.success(msg)
+                                else:
+                                    st.error(msg)
+                    elif em:
+                        if not db.is_valid_login_email(em):
+                            st.error("Please enter a valid email address.")
+                        else:
+                            ok, msg = db.create_user(em, rp)
+                            if ok:
+                                uid_new = db.get_user_id_by_login_email(em)
+                                if uid_new:
+                                    db.upsert_profile(
+                                        uid_new,
+                                        {"email": db.normalize_login_email(em)},
+                                    )
+                                st.success(msg)
+                            else:
+                                st.error(msg)
+                    else:
+                        ok_p, msg_p = db.create_user_phone(ph_raw, rp)
+                        if ok_p:
+                            _uidp = db.get_user_id_by_phone_e164(
+                                phone_auth.normalize_phone_e164(ph_raw) or ""
                             )
-                        st.success(msg)
-                    else:
-                        st.error(msg)
-        with tab_reg_phone:
-            st.caption("Create an account with your mobile number. Add an email later in **My profile**.")
-            rpn = st.text_input(
-                "Mobile number",
-                key="reg_phone_main",
-                placeholder="+91 98765 43210",
-            )
-            rpp = st.text_input("Password", type="password", key="reg_phone_pass")
-            rpp2 = st.text_input("Confirm password", type="password", key="reg_phone_pass2")
-            if st.button(
-                "Create account with phone",
-                use_container_width=True,
-                key="btn_reg_phone",
-                type="primary",
-            ):
-                if rpp != rpp2:
-                    st.error("Passwords do not match.")
-                else:
-                    ok_p, msg_p = db.create_user_phone(rpn, rpp)
-                    if ok_p:
-                        _uidp = db.get_user_id_by_phone_e164(
-                            phone_auth.normalize_phone_e164(rpn) or ""
-                        )
-                        if _uidp:
-                            db.upsert_profile(_uidp, {})
-                        st.success(msg_p)
-                    else:
-                        st.error(msg_p)
+                            if _uidp:
+                                db.upsert_profile(_uidp, {})
+                            st.success(msg_p)
+                        else:
+                            st.error(msg_p)
         st.divider()
         st.markdown(
             '<p class="sid-auth-preview-title">App preview</p>'

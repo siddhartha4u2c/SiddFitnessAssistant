@@ -10,6 +10,15 @@ DAY_MARKER = re.compile(r"---\s*DAY\s*(\d+)\s*---", re.IGNORECASE)
 # Strip diet section when generating workout imagery (prompt-only meals below this heading).
 _MEALS_SECTION_START = re.compile(r"(?i)\n\s*(?:#{1,4}\s*)meals\s*(?:\n|$)")
 
+# Free-text fields scanned for diet nuance (eggs while vegetarian, etc.) in weekly plan nutrition block.
+_DIET_NUANCE_KEYS = (
+    "coach_notes",
+    "meal_timing_notes",
+    "cuisine_preferences",
+    "foods_to_avoid",
+    "allergy_alerts",
+)
+
 
 def workout_body_for_image(day_body: str) -> str:
     """Training-only text for image prompts; drops ``#### Meals`` and everything after."""
@@ -18,6 +27,79 @@ def workout_body_for_image(day_body: str) -> str:
     if m:
         return body[: m.start()].strip()
     return body
+
+
+def diet_nuance_blob_from_profile(profile: dict) -> str:
+    """Concatenate user free-text that may refine diet (e.g. vegetarian + eggs)."""
+    parts: list[str] = []
+    for key in _DIET_NUANCE_KEYS:
+        v = (profile.get(key) or "").strip()
+        if v:
+            label = key.replace("_", " ")
+            parts.append(f"{label}: {v}")
+    return "; ".join(parts)
+
+
+def physique_descriptor_from_profile(
+    height_feet: float | None,
+    weight_kg: float | None,
+    gender: str = "",
+) -> str:
+    """Clause for image prompts: approximate build from height/weight (respectful, photorealistic)."""
+    try:
+        hf = float(height_feet) if height_feet is not None else 0.0
+        wk = float(weight_kg) if weight_kg is not None else 0.0
+    except (TypeError, ValueError):
+        hf, wk = 0.0, 0.0
+    if hf <= 0 or wk <= 0:
+        return (
+            "Natural, believable adult body for their apparent age; realistic proportions—not an exaggerated "
+            "fitness-model physique unless the workout clearly implies elite athletics."
+        )
+
+    height_m = hf * 0.3048
+    if height_m <= 0:
+        return (
+            "Natural, believable adult body; realistic proportions."
+        )
+    bmi = wk / (height_m * height_m)
+    g = (gender or "").strip().lower()
+
+    # Tall + moderate-to-high weight: user-requested "stocky / slight belly" (not BMI-only).
+    tall_soft = hf >= 6.0 and wk >= 80.0
+    nearly_tall_soft = hf >= 5.92 and wk >= 82.0  # ~5'11" and heavier
+
+    if bmi < 18.5:
+        base = "Slim or lean build; light frame; realistic muscle tone for someone who trains."
+    elif bmi < 23.0:
+        base = "Healthy weight range; average, realistic muscle definition—not overly shredded."
+    elif tall_soft or nearly_tall_soft:
+        base = (
+            "Sturdy or slightly bulky build for their height; **mild softness at the midsection** "
+            "(natural belly area—not athletic-cut abs). Looks like a regular person who trains, "
+            "not underweight; photorealistic and respectful."
+        )
+    elif bmi < 25.0:
+        base = (
+            "Average to slightly sturdy build; natural waistline—avoid extreme leanness or bodybuilder definition."
+        )
+    elif bmi < 30.0:
+        base = (
+            "Clearly in the overweight range for height; fuller torso and **visible midsection fullness**; "
+            "realistic skin and proportions; respectful depiction."
+        )
+    else:
+        base = (
+            "Higher body weight for height; fuller figure with **noticeable abdominal fullness**; "
+            "realistic, dignified portrayal—not caricatured."
+        )
+
+    if g == "female":
+        base += " Adult woman; same build cues apply with typical female fat distribution where relevant."
+    elif g == "male":
+        base += " Adult man; same build cues apply with typical male fat distribution where relevant."
+
+    return base
 
 
 def generate_week_plan_markdown(
@@ -79,10 +161,14 @@ Rules (meals):
 - **Vary the Day total sentence** each day: different verbs, length, and tone (sometimes one clause, sometimes two; never paste the same
   explanation seven times).
 - Align meals with **training vs rest** (e.g. slightly more carbs around harder training days when appropriate; still respect calorie rules).
-- Respect profile **diet pattern** (vegetarian, vegan, etc.), **allergy alerts**, and **foods to avoid**; use **cuisine / country** hints when helpful.
+- **Diet pattern is mandatory for every meal line:** Follow **NUTRITION / CALORIE RULES** and the profile summary exactly.
+  - If the profile says **Vegetarian**: **no meat, poultry, fish, or shellfish** in any meal. **Eggs and dairy are allowed** unless the profile or notes say otherwise (e.g. vegan, no eggs, plant-only). If the user notes they are vegetarian **and eat eggs** (or similar), treat them as **lacto-ovo vegetarian**: use **eggs** and dairy as primary proteins where appropriate and mention that pattern briefly in the week.
+  - If **Vegan**: no animal products (no meat, fish, dairy, eggs, honey); use legumes, tofu, tempeh, nuts, seeds, plant milks.
+  - If **Pescatarian**: fish/seafood OK; no other meat; respect eggs/dairy per notes.
+  - If **Non vegetarian** / omnivore: poultry, fish, eggs, dairy, legumes, etc. are OK (still **no beef**—see below).
+- Respect **allergy alerts** and **foods to avoid**; use **cuisine / country** hints when helpful. Merge any **coach notes** or **meal timing** details that refine diet (e.g. "vegetarian but eats eggs") into actual meal choices and wording.
 - **Never include beef** in any meal suggestion (no beef, steak, ground beef, beef mince, beef jerky, beef broth/stock from beef, or beef-based
-  sauces as the main protein). Use poultry, fish, eggs, dairy (if diet allows), legumes, tofu/tempeh, lamb, pork, or other proteins instead when
-  meat is appropriate.
+  sauces as the main protein). When meat is allowed, use poultry, fish, eggs, dairy (if diet allows), legumes, tofu/tempeh, lamb, pork, or other proteins instead.
 - Keep language practical (grocery-realistic); no medical claims.
 
 Formatting:
@@ -166,16 +252,27 @@ def _gender_phrase(gender: str) -> str:
 
 
 def build_image_prompt(
-    day_num: int, exercise_text: str, has_reference_face: bool, gender: str
+    day_num: int,
+    exercise_text: str,
+    has_reference_face: bool,
+    gender: str,
+    physique_descriptor: str = "",
 ) -> str:
     ex = (exercise_text or "")[:1200]
     at_home = is_likely_rest_or_home_day(exercise_text)
+    phys = (physique_descriptor or "").strip()
+    body_line = (
+        f"\n\nBody build (keep **consistent** across all seven day images for this same person): {phys}"
+        if phys
+        else ""
+    )
 
     if at_home:
         scene = f"""Photorealistic photo at home — NOT a gym. Day {day_num}: rest, recovery, or light activity in a believable home setting
 (living room, bedroom, balcony, or quiet residential space). No barbells, racks, or commercial gym equipment.
 Show the person in comfortable casual or light activewear doing gentle movement that fits this plan:
 {ex}
+{body_line}
 
 Warm natural indoor light, calm atmosphere, full-body or three-quarter view. No text overlays, no readable logos."""
         face_suffix = (
@@ -191,13 +288,14 @@ Warm natural indoor light, calm atmosphere, full-body or three-quarter view. No 
     scene = f"""Photorealistic photo in a modern, well-lit gym. Visualize Day {day_num} training.
 Show a person in workout clothes with equipment that fits this plan (barbell, rack, bench, cables, etc. as appropriate):
 {ex}
+{body_line}
 
 Natural lighting, sharp focus, authentic gym background, full-body or three-quarter view. No text overlays, no readable logos."""
 
     if has_reference_face:
         return (
             scene
-            + " The first image is a reference portrait: keep this same person's face and general age/skin tone in the gym scene. Invented gym scenario only; same individual."
+            + " The first image is a reference portrait: keep this same person's face and general age/skin tone in the gym scene; **match the reference person's body size and shape** to the build description above. Invented gym scenario only; same individual."
         )
     gp = _gender_phrase(gender)
     return (
@@ -239,6 +337,7 @@ def _generate_day_image_euri_openai(
     day_num: int,
     exercise_text: str,
     gender: str,
+    physique_descriptor: str = "",
 ) -> tuple[bytes | None, str | None]:
     """EURI images API (OpenAI-style); prompt-only, no reference photo."""
     import base64
@@ -247,7 +346,9 @@ def _generate_day_image_euri_openai(
 
     from openai import OpenAI
 
-    prompt = build_image_prompt(day_num, exercise_text, False, gender)
+    prompt = build_image_prompt(
+        day_num, exercise_text, False, gender, physique_descriptor=physique_descriptor
+    )
     client = OpenAI(api_key=api_key, base_url=base_url.rstrip("/"))
     try:
         resp = client.images.generate(
@@ -290,6 +391,7 @@ def _generate_day_image_once(
     reference_image_bytes: bytes | None,
     reference_mime: str,
     gender: str,
+    physique_descriptor: str = "",
 ) -> tuple[bytes | None, str | None]:
     """Google Gemini native image output (multimodal; optional reference face)."""
     from google import genai
@@ -297,7 +399,13 @@ def _generate_day_image_once(
 
     client = genai.Client(api_key=api_key)
     has_ref = bool(reference_image_bytes)
-    prompt = build_image_prompt(day_num, exercise_text, has_ref, gender)
+    prompt = build_image_prompt(
+        day_num,
+        exercise_text,
+        has_ref,
+        gender,
+        physique_descriptor=physique_descriptor,
+    )
     parts: list[Any] = []
     if has_ref:
         parts.append(
@@ -356,6 +464,7 @@ def generate_day_image(
                 reference_image_bytes,
                 reference_mime,
                 gender,
+                physique_descriptor=physique_descriptor,
             )
             if img:
                 return img, None
@@ -366,6 +475,7 @@ def generate_day_image(
                 day_num,
                 exercise_text,
                 gender,
+                physique_descriptor=physique_descriptor,
             )
             if img2:
                 return img2, None
@@ -391,6 +501,7 @@ def generate_day_image(
         reference_image_bytes,
         reference_mime,
         gender,
+        physique_descriptor=physique_descriptor,
     )
     if img:
         return img, None
@@ -403,6 +514,7 @@ def generate_day_image(
             reference_image_bytes,
             reference_mime,
             gender,
+            physique_descriptor=physique_descriptor,
         )
         if img2:
             return img2, None

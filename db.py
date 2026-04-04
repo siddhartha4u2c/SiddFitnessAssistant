@@ -132,6 +132,8 @@ def init_db() -> None:
         _ensure_profile_columns(conn)
         _ensure_user_columns(conn)
         _ensure_phone_otp_table(conn)
+        _ensure_email_otp_table(conn)
+        _ensure_goal_tracking_table(conn)
 
 
 def _ensure_user_columns(conn: sqlite3.Connection) -> None:
@@ -163,6 +165,42 @@ def _ensure_phone_otp_table(conn: sqlite3.Connection) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_phone_otp_phone_time
             ON phone_otp_challenges(phone_e164, created_at DESC);
+        """
+    )
+
+
+def _ensure_email_otp_table(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS email_otp_challenges (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email_normalized TEXT NOT NULL,
+            code_hash TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_email_otp_email_time
+            ON email_otp_challenges (email_normalized, created_at DESC);
+        """
+    )
+
+
+def _ensure_goal_tracking_table(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS goal_tracking_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            recorded_at TEXT NOT NULL,
+            source TEXT NOT NULL,
+            primary_goal_at_time TEXT DEFAULT '',
+            body_weight_kg REAL,
+            height_feet REAL,
+            coach_notes_excerpt TEXT DEFAULT '',
+            detail TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_goal_tracking_user_time
+            ON goal_tracking_events (user_id, recorded_at DESC);
         """
     )
 
@@ -342,6 +380,56 @@ def verify_phone_otp_and_get_user_id(phone_e164: str, code_plain: str) -> int | 
             return None
         conn.execute("DELETE FROM phone_otp_challenges WHERE id = ?", (int(row["id"]),))
     return get_user_id_by_phone_e164(phone_e164)
+
+
+def create_email_otp_challenge(login_email: str) -> tuple[str | None, str]:
+    """Return (plain 6-digit code, error message). Requires a real sign-in email (users.username)."""
+    login_email = normalize_login_email(login_email)
+    if not login_email:
+        return None, "Enter your email address."
+    if not is_valid_login_email(login_email):
+        return None, "Enter a valid email address."
+    if get_user_id_by_login_email(login_email) is None:
+        return None, "No account uses this sign-in email."
+    plain = f"{secrets.randbelow(900000) + 100000:06d}"
+    h = hashlib.sha256(plain.encode()).hexdigest()
+    exp = datetime.now(timezone.utc) + timedelta(minutes=10)
+    exp_s = exp.replace(microsecond=0).isoformat()
+    with get_conn() as conn:
+        conn.execute(
+            "DELETE FROM email_otp_challenges WHERE email_normalized = ?",
+            (login_email,),
+        )
+        conn.execute(
+            """
+            INSERT INTO email_otp_challenges (email_normalized, code_hash, expires_at, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (login_email, h, exp_s, _utc_now_iso()),
+        )
+    return plain, ""
+
+
+def verify_email_otp_and_get_user_id(login_email: str, code_plain: str) -> int | None:
+    login_email = normalize_login_email(login_email)
+    code_plain = (code_plain or "").strip()
+    if not login_email or len(code_plain) < 4:
+        return None
+    h = hashlib.sha256(code_plain.encode()).hexdigest()
+    now = _utc_now_iso()
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT id FROM email_otp_challenges
+            WHERE email_normalized = ? AND code_hash = ? AND expires_at > ?
+            ORDER BY created_at DESC LIMIT 1
+            """,
+            (login_email, h, now),
+        ).fetchone()
+        if row is None:
+            return None
+        conn.execute("DELETE FROM email_otp_challenges WHERE id = ?", (int(row["id"]),))
+    return get_user_id_by_login_email(login_email)
 
 
 def update_user_login_email(user_id: int, new_email: str) -> tuple[bool, str]:
@@ -745,3 +833,183 @@ def list_chat_messages(user_id: int, limit: int = 40) -> list[dict[str, Any]]:
         ).fetchall()
     chronological = list(reversed(rows))
     return [dict(r) for r in chronological]
+
+
+def _user_message_suggests_goal(text: str) -> bool:
+    """Lightweight filter so routine chat does not flood the goal timeline."""
+    t = (text or "").strip().lower()
+    if len(t) < 10:
+        return False
+    phrases = (
+        "my goal",
+        "primary goal",
+        "i want to lose",
+        "i want to gain",
+        "want to lose",
+        "want to gain",
+        "trying to lose",
+        "trying to gain",
+        "trying to build",
+        "aim to lose",
+        "aim to gain",
+        "aiming to lose",
+        "aiming to gain",
+        "target weight",
+        "goal weight",
+        "lose weight",
+        "gain weight",
+        "build muscle",
+        "fat loss",
+        "lose fat",
+        "cutting phase",
+        "bulking",
+        "by summer",
+        "by winter",
+        "by spring",
+        "by fall",
+        "by january",
+        "by february",
+        "by march",
+        "by april",
+        "by may",
+        "by june",
+        "by july",
+        "by august",
+        "by september",
+        "by october",
+        "by november",
+        "by december",
+        " lose 5",
+        " lose 10",
+        " lose 15",
+        " gain 5",
+        " gain 10",
+        " kg by",
+        " lbs by",
+        " pounds by",
+        " kilos by",
+        "reach my",
+        "get to ",
+        "get down to",
+        "i hope to",
+        "i'd like to lose",
+        "i'd like to gain",
+    )
+    return any(p in t for p in phrases)
+
+
+def add_goal_tracking_event(
+    user_id: int,
+    *,
+    source: str,
+    detail: str,
+    primary_goal_at_time: str = "",
+    body_weight_kg: float | None = None,
+    height_feet: float | None = None,
+    coach_notes_excerpt: str = "",
+) -> None:
+    src = (source or "").strip().lower()
+    if src not in ("profile", "chat"):
+        src = "chat"
+    det = (detail or "").strip()
+    if not det:
+        return
+    cn = (coach_notes_excerpt or "").strip()
+    if len(cn) > 500:
+        cn = cn[:497] + "..."
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO goal_tracking_events (
+                user_id, recorded_at, source, primary_goal_at_time,
+                body_weight_kg, height_feet, coach_notes_excerpt, detail
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                _utc_now_iso(),
+                src,
+                (primary_goal_at_time or "").strip()[:200],
+                body_weight_kg,
+                height_feet,
+                cn,
+                det[:4000],
+            ),
+        )
+
+
+def record_profile_primary_goal_change(
+    user_id: int,
+    old_goal: str | None,
+    new_goal: str | None,
+    *,
+    body_weight_kg: float | None,
+    height_feet: float | None,
+    coach_notes: str = "",
+) -> None:
+    old = (old_goal or "").strip()
+    new = (new_goal or "").strip()
+    if old == new:
+        return
+    cn_ex = (coach_notes or "").strip()
+    detail = (
+        f"Primary goal in profile: '{old or '(not set)'}' → '{new or '(cleared)'}'."
+    )
+    add_goal_tracking_event(
+        user_id,
+        source="profile",
+        detail=detail,
+        primary_goal_at_time=new,
+        body_weight_kg=body_weight_kg,
+        height_feet=height_feet,
+        coach_notes_excerpt=cn_ex,
+    )
+
+
+def record_chat_goal_mention_if_relevant(user_id: int, user_message: str) -> None:
+    if not _user_message_suggests_goal(user_message):
+        return
+    p = get_profile(user_id)
+    bw = p.get("body_weight_kg")
+    hf = p.get("height_feet")
+    try:
+        bwf = float(bw) if bw is not None else None
+    except (TypeError, ValueError):
+        bwf = None
+    try:
+        hff = float(hf) if hf is not None else None
+    except (TypeError, ValueError):
+        hff = None
+    pg = (p.get("primary_goal") or "").strip()
+    msg = (user_message or "").strip()
+    if len(msg) > 1200:
+        msg = msg[:1197] + "..."
+    detail = f'User wrote in coach chat: "{msg}"'
+    add_goal_tracking_event(
+        user_id,
+        source="chat",
+        detail=detail,
+        primary_goal_at_time=pg,
+        body_weight_kg=bwf,
+        height_feet=hff,
+        coach_notes_excerpt=(p.get("coach_notes") or "").strip()[:500],
+    )
+
+
+def list_goal_tracking_events(user_id: int, limit: int = 40) -> list[dict[str, Any]]:
+    """Oldest-first within the window (latest ``limit`` rows by time)."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, recorded_at, source, primary_goal_at_time,
+                   body_weight_kg, height_feet, coach_notes_excerpt, detail
+            FROM goal_tracking_events
+            WHERE user_id = ?
+            ORDER BY recorded_at DESC
+            LIMIT ?
+            """,
+            (user_id, limit),
+        ).fetchall()
+    rev = list(reversed(rows))
+    return [dict(r) for r in rev]

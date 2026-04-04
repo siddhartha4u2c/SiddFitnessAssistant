@@ -22,6 +22,40 @@ def smtp_configured() -> bool:
     )
 
 
+def send_login_otp_email(to_address: str, code: str) -> None:
+    """Send a short-lived sign-in code (same SMTP config as password reset)."""
+    server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    port = int(os.getenv("SMTP_PORT") or "587")
+    user = os.getenv("SMTP_USERNAME", "").strip()
+    password = _smtp_password()
+    sender = (os.getenv("MAIL_DEFAULT_SENDER") or user).strip()
+    if not (user and password and sender):
+        raise RuntimeError("SMTP is not fully configured in the environment.")
+
+    subject = "Your sign-in code — SID Fitness Assistant"
+    body = f"""Hello,
+
+Your one-time sign-in code is:
+
+{code}
+
+It expires in 10 minutes. If you did not request this, you can ignore this email.
+
+—
+This message was sent from an automated address. Do not reply.
+"""
+    msg = MIMEMultipart()
+    msg["Subject"] = subject
+    msg["From"] = sender
+    msg["To"] = to_address
+    msg.attach(MIMEText(body, "plain", "utf-8"))
+
+    with smtplib.SMTP(server, port, timeout=30) as smtp:
+        smtp.starttls()
+        smtp.login(user, password)
+        smtp.sendmail(sender, [to_address], msg.as_string())
+
+
 def send_password_reset_email(
     to_address: str,
     reset_url: str,
