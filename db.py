@@ -7,7 +7,7 @@ import re
 import secrets
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -132,6 +132,7 @@ def init_db() -> None:
         _ensure_profile_columns(conn)
         _ensure_user_columns(conn)
         _ensure_goal_tracking_table(conn)
+        _ensure_daily_activities_table(conn)
 
 
 def _ensure_user_columns(conn: sqlite3.Connection) -> None:
@@ -149,6 +150,85 @@ def _ensure_user_columns(conn: sqlite3.Connection) -> None:
             "ON users(phone_e164) WHERE phone_e164 IS NOT NULL "
             "AND length(trim(phone_e164)) > 0"
         )
+
+
+def _ensure_daily_activities_table(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS daily_activities (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            activity_date TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            notes TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_daily_activities_user_date
+            ON daily_activities (user_id, activity_date DESC, id DESC);
+        """
+    )
+
+
+_ACTIVITY_KINDS = frozenset({"exercise", "meal_food", "other"})
+
+
+def add_daily_activity(user_id: int, activity_date: str, kind: str, notes: str) -> None:
+    """Log one calendar-day activity (exercise, meal/food, or other). ``activity_date`` YYYY-MM-DD."""
+    notes = (notes or "").strip()
+    if not notes:
+        return
+    k = (kind or "other").strip().lower()
+    if k not in _ACTIVITY_KINDS:
+        k = "other"
+    day = (activity_date or "").strip()[:10]
+    if len(day) < 10:
+        return
+    try:
+        day_d = date.fromisoformat(day)
+    except ValueError:
+        return
+    if day_d > date.today():
+        return
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO daily_activities (user_id, activity_date, kind, notes, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (user_id, day, k, notes, _utc_now_iso()),
+        )
+
+
+def list_daily_activities(user_id: int, days_back: int = 90) -> list[dict[str, Any]]:
+    """Newest calendar days first; within a day, newest id first."""
+    start = (datetime.now(timezone.utc).date() - timedelta(days=max(1, days_back))).isoformat()
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, activity_date, kind, notes, created_at FROM daily_activities
+            WHERE user_id = ? AND activity_date >= ?
+            ORDER BY activity_date DESC, id DESC
+            """,
+            (user_id, start),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def list_daily_activities_on_date(user_id: int, activity_date: str) -> list[dict[str, Any]]:
+    """All entries for one calendar day (oldest first within the day)."""
+    day = (activity_date or "").strip()[:10]
+    if len(day) < 10:
+        return []
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, activity_date, kind, notes, created_at FROM daily_activities
+            WHERE user_id = ? AND activity_date = ?
+            ORDER BY id ASC
+            """,
+            (user_id, day),
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def _ensure_goal_tracking_table(conn: sqlite3.Connection) -> None:
@@ -649,12 +729,13 @@ def add_chat_message(user_id: int, role: str, content: str) -> None:
 
 
 def list_chat_messages(user_id: int, limit: int = 40) -> list[dict[str, Any]]:
+    """Return messages oldest-first for UI (user turn, then coach reply). Same-second pairs need id tie-break."""
     with get_conn() as conn:
         rows = conn.execute(
             """
-            SELECT role, content, created_at FROM chat_messages
+            SELECT id, role, content, created_at FROM chat_messages
             WHERE user_id = ?
-            ORDER BY created_at DESC
+            ORDER BY created_at DESC, id DESC
             LIMIT ?
             """,
             (user_id, limit),

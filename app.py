@@ -1,6 +1,7 @@
 import html
 import io
 import os
+from datetime import date
 from pathlib import Path
 
 import streamlit as st
@@ -526,10 +527,11 @@ direct, and human—not a bot or a lecture. Your answers must be:
 - Clear that you are not a doctor or registered dietitian and this is not medical advice.
 
 PROFILE & SAVED DATA (every message): **SAVED PROFILE**, **COMPLETE PROFILE RECORD**, weight history, meals,
-and energy context are **reloaded from the database for this exact question**—they reflect the user's
-**latest saves** (including any profile updates since earlier chat). If older chat messages disagree with
-the profile or logs below, **follow the profile and logs** and do not assume outdated details from chat
-history. When helpful, you may briefly acknowledge an update (e.g. goal or weight change) if it stands out.
+**DAILY ACTIVITY LOG** (user-logged exercise / meals-food / other by calendar day), and energy context are
+**reloaded from the database for this exact question**—they reflect the user's **latest saves** (including any
+profile updates since earlier chat). If older chat messages disagree with the profile or logs below,
+**follow the profile and logs** and do not assume outdated details from chat history. When helpful, you may
+briefly acknowledge an update (e.g. goal or weight change) if it stands out.
 
 HUMAN TONE: Write the way a good coach would talk out loud. Short opening empathy when it fits
 ("That happens," "Good you checked in," "Two days off is not the end of a plan"). Avoid guilt, shame,
@@ -728,6 +730,127 @@ def format_goal_timeline(events: list) -> str:
     return "\n".join(lines)
 
 
+def _activity_kind_label(kind: str) -> str:
+    return {
+        "exercise": "Exercise",
+        "meal_food": "Meal/food",
+        "other": "Other",
+    }.get((kind or "").strip(), kind or "Other")
+
+
+def format_daily_activities_for_coach(rows: list) -> str:
+    if not rows:
+        return "(No entries in the daily activity log yet.)"
+    lines: list[str] = []
+    last_date = ""
+    for r in rows:
+        d = str(r.get("activity_date") or "")
+        if d != last_date:
+            last_date = d
+            lines.append(f"\n=== {d} ===")
+        note = (r.get("notes") or "").strip().replace("\n", " ")
+        lines.append(f"- [{_activity_kind_label(r.get('kind', ''))}] {note}")
+    return "\n".join(lines).strip()
+
+
+def _render_daily_activity_logger(user_id: int) -> None:
+    """Popover body: log by calendar day; coach prompt includes recent rows."""
+    _today = date.today()
+    st.caption(
+        "Log **exercise**, **meals or food**, or **other** notes for any day. Your coach sees roughly the "
+        "**last 90 days**."
+    )
+    _log_d = st.session_state.get("sid_activity_log_date")
+    if isinstance(_log_d, date) and _log_d > _today:
+        st.session_state["sid_activity_log_date"] = _today
+    picked = st.date_input(
+        "Date",
+        value=_today,
+        max_value=_today,
+        key="sid_activity_log_date",
+    )
+    kind = st.selectbox(
+        "Type",
+        options=["exercise", "meal_food", "other"],
+        format_func=lambda x: {
+            "exercise": "Exercise / training",
+            "meal_food": "Meal or food consumed",
+            "other": "Other",
+        }[x],
+        key="sid_activity_log_kind",
+    )
+    notes = st.text_area(
+        "What did you do or eat?",
+        placeholder="e.g. 40 min strength; or oats, fruit, coffee for breakfast",
+        key="sid_activity_log_notes",
+        height=90,
+    )
+    if st.button("Save entry", key="sid_btn_save_activity", type="primary"):
+        t = (notes or "").strip()
+        if not t:
+            st.warning("Add a short description.")
+        else:
+            db.add_daily_activity(user_id, picked.isoformat(), kind, t)
+            st.success("Saved.")
+            # Drop widget state so reopening the popover shows empty fields (not the last saved text).
+            for _k in (
+                "sid_activity_log_notes",
+                "sid_activity_log_date",
+                "sid_activity_log_kind",
+            ):
+                st.session_state.pop(_k, None)
+            st.rerun()
+    st.divider()
+    st.markdown("**View a day**")
+    st.caption("Pick a date to see everything you logged that day.")
+    # Apply jump *before* st.date_input: Streamlit forbids mutating a widget's session key after it runs.
+    _pending_jump = st.session_state.pop("sid_activity_jump_pending", None)
+    if _pending_jump:
+        try:
+            _pj = date.fromisoformat(str(_pending_jump).strip()[:10])
+            st.session_state["sid_activity_lookup_day"] = _pj if _pj <= _today else _today
+        except ValueError:
+            pass
+    if "sid_activity_lookup_day" not in st.session_state:
+        st.session_state["sid_activity_lookup_day"] = _today
+    else:
+        _lk = st.session_state["sid_activity_lookup_day"]
+        if isinstance(_lk, date) and _lk > _today:
+            st.session_state["sid_activity_lookup_day"] = _today
+    lookup = st.date_input("Day", max_value=_today, key="sid_activity_lookup_day")
+    day_key = lookup.isoformat()
+    day_entries = db.list_daily_activities_on_date(user_id, day_key)
+    if not day_entries:
+        st.info("No entries for this day.")
+    else:
+        st.caption(f"{len(day_entries)} entr{'y' if len(day_entries) == 1 else 'ies'} on **{day_key}**")
+        for r in day_entries:
+            ts = (r.get("created_at") or "")[:16].replace("T", " ")
+            st.markdown(f"**{_activity_kind_label(r.get('kind', ''))}**" + (f" · saved {ts}" if ts.strip() else ""))
+            st.write((r.get("notes") or "").strip() or "—")
+
+    recent = db.list_daily_activities(user_id, days_back=120)
+    if recent:
+        st.divider()
+        st.caption("**Jump to a recent day** (sets the day above)")
+        distinct: list[str] = []
+        for r in recent:
+            dd = r["activity_date"]
+            if dd not in distinct:
+                distinct.append(dd)
+            if len(distinct) >= 16:
+                break
+        ncols = min(4, max(1, len(distinct)))
+        cols = st.columns(ncols)
+        for i, dd in enumerate(distinct):
+            with cols[i % ncols]:
+                if st.button(dd, key=f"sid_act_jump_{dd}", use_container_width=True):
+                    st.session_state["sid_activity_jump_pending"] = dd
+                    st.rerun()
+    elif not day_entries:
+        st.caption("Save an entry above to start your log.")
+
+
 def format_meal_log(rows: list) -> str:
     if not rows:
         return "(No saved meals yet.)"
@@ -784,6 +907,8 @@ def build_coach_prompt(
     weights = db.list_weight_entries(user_id, 30)
     goal_events = db.list_goal_tracking_events(user_id, 40)
     meals = db.list_meal_entries(user_id, 8)
+    activities = db.list_daily_activities(user_id, 90)
+    activity_block = format_daily_activities_for_coach(activities)
     history = db.list_chat_messages(user_id, 24)
     hist_lines = []
     for h in history:
@@ -828,6 +953,9 @@ def build_coach_prompt(
 
 === RECENT SAVED MEALS ===
 {format_meal_log(meals)}
+
+=== DAILY ACTIVITY LOG (user-logged by calendar day; exercise, meals/food, other—~last 90 days) ===
+{activity_block}
 
 === PRIOR CHAT (chronological; bracketed dates = when saved—use gaps to infer time away) ===
 {hist_block}
@@ -2133,9 +2261,16 @@ def render_main_content() -> None:
 if active:
     _guest_auth_body_class_remove()
     st.markdown(_signed_in_theme_css(), unsafe_allow_html=True)
-    head_l, head_r = st.columns([5, 2])
+    head_l, head_mid, head_r = st.columns([4.2, 2.2, 1.2])
     with head_l:
         st.title("🏋️ SID Fitness Assistant")
+    with head_mid:
+        with st.popover(
+            "Register your activity",
+            icon=":material/calendar_month:",
+            use_container_width=True,
+        ):
+            _render_daily_activity_logger(int(st.session_state.user_id))
     with head_r:
         if st.button("Log out", use_container_width=False, key="btn_logout"):
             st.session_state.user_id = None
@@ -2235,10 +2370,7 @@ else:
                                 "Nothing else is shown for privacy."
                             )
         with tab_reg:
-            st.caption(
-                "Create an account with your **email** and a password. You can add an optional mobile "
-                "number later under **My profile**."
-            )
+            st.caption("Create an account with your **email** and a password.")
             reg_em = st.text_input(
                 "Email",
                 key="reg_unified_email",
