@@ -869,6 +869,39 @@ Use when the user asks what to **avoid**, **cut**, or **reduce while losing weig
 - **Kind, non-moralizing**—avoid “bad food” language; emphasize **portions**, **frequency**, and **what fits their calorie and protein targets**.
 """
 
+# Packaged snacks, drinks, label-reading—practical shopping and swap ideas (not brand endorsement).
+COACH_PACKAGED_SNACKS_DRINKS_REFERENCE = """
+=== PACKAGED FOODS, DRINKS, BISCUITS (labels, swaps, goals) ===
+Use when the user asks about **packaged snacks**, **biscuits**, **soft drinks**, **energy drinks**, **what to buy at the store**, or **healthier swaps**. This is **general coaching**, not medical advice. Respect **diet pattern** (vegan: skip eggs/dairy; suggest tofu, legumes, plant protein), **allergies** (nuts, peanuts, gluten), **diabetes** (carbs/sugar on labels), and **caffeine sensitivity**.
+
+**1. Always check ingredients before buying**
+- Teach **habit**: glance at **ingredients** (order = amount), **added sugar** per serve, **saturated fat**, **sodium**, and **serving size**—marketing words like “digestive,” “multigrain,” or “oats” don’t guarantee a better choice until you read the panel.
+- Shorter **recognizable** ingredient lists often beat long lists of fillers and sugars—still compare **calories and protein** to their goal.
+
+**2. Avoid energy drinks and soft drinks (as defaults)**
+- **Soft drinks**: mostly **added sugar** or sweeteners + **little nutrition**—easy to drink a lot of calories without fullness.
+- **Energy drinks**: **caffeine** often very high; not needed for most people; caution on **heart**, **sleep**, **anxiety**, **mixing with alcohol**—keep tone **practical**, not alarmist; **water**, **milk/plant milk**, **tea/coffee in moderation**, or **fruit + water** as usual alternatives.
+
+**If the goal is fat loss**
+- **Biscuits**: treat as **occasional**; a rough frame some clients use is about **2–3 small biscuits max** when they really want them—**log calories** and don’t graze the whole pack.
+
+**If the goal is muscle gain**
+- Prefer **real food** for most meals/snacks: **eggs**, **paneer** (or dairy-free protein if vegan), **nuts** (portion-aware), **dal**, **yogurt**, **chicken/fish** if they eat them—**biscuits** rarely replace protein needs.
+
+**Better snack alternatives (when they fit the person)**
+- **Roasted chana** (protein + fiber; watch salt on packaged types).
+- **Fruit** (whole fruit over juice for most goals).
+- **Peanut butter + roti** (or bread)—**calorie-dense**; measure a **spoon or two**; skip or swap if **peanut allergy**.
+- **Boiled eggs** (quick protein; omit for vegan).
+
+**If they still want biscuits**
+- Compare labels: **lower added sugar**, **some fiber**, **reasonable serving** beats deep-fried or cream-filled types.
+- **Examples** some people use as **relatively budget-friendly or fiber-forward** options include **NutriChoice-style** or **oats / millet** biscuits—still **read the label**; these are **not** automatically “health foods.”
+
+**Bottom line**
+- **Biscuits = convenience food, not health food**—fine sometimes if portions and daily totals fit their plan; don’t present any **brand** as mandatory or medically superior.
+"""
+
 
 def profile_to_blurb(p: dict) -> str:
     if not p:
@@ -1232,6 +1265,7 @@ def build_coach_prompt(
 {COACH_DRINKS_DETOX_REFERENCE}
 {COACH_STRENGTH_SNACKS_REFERENCE}
 {COACH_FAT_LOSS_FOOD_LIMITS_REFERENCE}
+{COACH_PACKAGED_SNACKS_DRINKS_REFERENCE}
 === PROFILE CONTEXT (this turn) ===
 - Data below was read from the database when the user sent this message (latest saves apply).
 - Account sign-in email: {login_id}
