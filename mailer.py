@@ -24,12 +24,11 @@ def smtp_configured() -> bool:
     )
 
 
-def send_password_reset_email(
-    to_address: str,
-    reset_url: str,
-    *,
-    username_hint: str | None = None,
-) -> None:
+def _send_smtp_plain(to_address: str, subject: str, body: str) -> None:
+    to_address = (to_address or "").strip()
+    if not to_address:
+        raise RuntimeError("No recipient address for email.")
+
     server = (os.getenv("SMTP_SERVER") or "smtp.gmail.com").strip()
     port = int(os.getenv("SMTP_PORT") or "587")
     user = os.getenv("SMTP_USERNAME", "").strip()
@@ -38,7 +37,6 @@ def send_password_reset_email(
     if not (user and password and sender):
         raise RuntimeError("SMTP is not fully configured in the environment.")
 
-    # Common typo: smtp.gmail.co (invalid) vs smtp.gmail.com
     _sl = server.lower().rstrip("/")
     if _sl.endswith("gmail.co") and not _sl.endswith("gmail.com"):
         raise RuntimeError(
@@ -46,21 +44,6 @@ def send_password_reset_email(
             f"For Gmail set SMTP_SERVER=smtp.gmail.com (note the **.com**) in your .env file."
         )
 
-    subject = "Password reset — SID Fitness Assistant"
-    name_part = f" for account ({username_hint})" if username_hint else ""
-    body = f"""Hello,
-
-You requested a password reset{name_part} for the SID Fitness Assistant app.
-
-Open this link in your browser (valid for 1 hour):
-
-{reset_url}
-
-If you did not request this, you can ignore this email. Your password will not change.
-
-—
-This message was sent from an automated address. Do not reply.
-"""
     msg = MIMEMultipart()
     msg["Subject"] = subject
     msg["From"] = sender
@@ -81,7 +64,6 @@ This message was sent from an automated address. Do not reply.
     except socket.gaierror as e:
         raise RuntimeError(_dns_err.format(e)) from e
     except OSError as e:
-        # Linux often errno -2; Windows often 11001 (WSAHOST_NOT_FOUND) for bad hostname.
         code = getattr(e, "errno", None)
         win = getattr(e, "winerror", None)
         if code == -2 or win in (11001, 11002, 11003) or "Name or service not known" in str(
@@ -89,3 +71,45 @@ This message was sent from an automated address. Do not reply.
         ):
             raise RuntimeError(_dns_err.format(e)) from e
         raise
+
+
+def send_password_reset_email(
+    to_address: str,
+    reset_url: str,
+    *,
+    username_hint: str | None = None,
+) -> None:
+    subject = "Password reset — SID Fitness Assistant"
+    name_part = f" for account ({username_hint})" if username_hint else ""
+    body = f"""Hello,
+
+You requested a password reset{name_part} for the SID Fitness Assistant app.
+
+Open this link in your browser (valid for 1 hour):
+
+{reset_url}
+
+If you did not request this, you can ignore this email. Your password will not change.
+
+—
+This message was sent from an automated address. Do not reply.
+"""
+    _send_smtp_plain(to_address, subject, body)
+
+
+def send_email_verification_email(to_address: str, verify_url: str) -> None:
+    subject = "Activate your account — SID Fitness Assistant"
+    body = f"""Hello,
+
+Thanks for registering with the SID Fitness Assistant app.
+
+Open this link in your browser to activate your account (valid for 1 hour):
+
+{verify_url}
+
+If you did not create an account, you can ignore this email.
+
+—
+This message was sent from an automated address. Do not reply.
+"""
+    _send_smtp_plain(to_address, subject, body)

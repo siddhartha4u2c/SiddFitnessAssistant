@@ -7,8 +7,27 @@ import re
 from typing import Any
 
 DAY_MARKER = re.compile(r"---\s*DAY\s*(\d+)\s*---", re.IGNORECASE)
+
+# Coach-chat phrases that imply the user eats meat / is not vegetarian (typos included).
+_NONVEG_CHAT_RE = re.compile(
+    r"(?:"
+    r"non[-\s]?veget\w*|nonveget\w*|\bomnivore\b|"
+    r"i['\s]?m not (a )?veget\w*|not (a )?vegetarian|"
+    r"not vegan|"
+    r"\b(?:i|we)\s+eat\s+(?:chicken|meat|fish|pork|turkey|seafood|shellfish|eggs)\b|"
+    r"\beat\s+(?:chicken|meat|fish|pork|turkey|seafood)\b|"
+    r"includes? (?:chicken|meat|fish)|"
+    r"\bnon[-\s]?veg\b|"
+    r"with (?:chicken|meat|fish|pork|turkey|eggs)"
+    r")",
+    re.IGNORECASE,
+)
 # Strip diet section when generating workout imagery (prompt-only meals below this heading).
 _MEALS_SECTION_START = re.compile(r"(?i)\n\s*(?:#{1,4}\s*)meals\s*(?:\n|$)")
+_TRAINING_UNTIL_MEALS = re.compile(
+    r"(?is)####\s*Training\s*\n(.*?)(?=^\s*####\s*Meals\b|\Z)",
+    re.MULTILINE,
+)
 
 # Free-text fields scanned for diet nuance (eggs while vegetarian, etc.) in weekly plan nutrition block.
 _DIET_NUANCE_KEYS = (
@@ -27,6 +46,128 @@ def workout_body_for_image(day_body: str) -> str:
     if m:
         return body[: m.start()].strip()
     return body
+
+
+def training_section_text(day_body: str) -> str:
+    """Body of ``#### Training`` through ``#### Meals`` (or end)."""
+    w = (day_body or "").strip()
+    m = _TRAINING_UNTIL_MEALS.search(w)
+    if m:
+        return m.group(1).strip()
+    return workout_body_for_image(day_body)
+
+
+def meal_plan_diet_scope_lines(profile: dict, user_chat_texts: list[str]) -> list[str]:
+    """Rules for which proteins/meal types appear in the 7-day plan (profile + user coach-chat)."""
+    dp = (profile.get("diet_pattern") or "").strip()
+    if dp == "Omnivore":
+        dp = "Non vegetarian"
+
+    user_blob = "\n".join((t or "").strip() for t in user_chat_texts if (t or "").strip()).lower()
+    chat_nonveg = bool(_NONVEG_CHAT_RE.search(user_blob)) if user_blob else False
+    chat_vegan = (
+        bool(re.search(r"\bvegan\b|whole-food plant|plant-based only|no animal products", user_blob))
+        and "not vegan" not in user_blob
+        if user_blob
+        else False
+    )
+
+    nuance = diet_nuance_blob_from_profile(profile)
+    out: list[str] = []
+
+    if dp == "Vegan":
+        out.append(
+            "**MEAL PROTEIN SCOPE — VEGAN (profile):** Every breakfast, lunch, and dinner must be **fully vegan**: "
+            "no meat, fish, poultry, dairy, eggs, or honey. Use legumes, tofu, tempeh, seitan, nuts, seeds, and plant milks only."
+        )
+    elif dp == "Vegetarian":
+        out.append(
+            "**MEAL PROTEIN SCOPE — VEGETARIAN (profile):** Meals must be **lacto-ovo vegetarian**: no meat, poultry, fish, or shellfish. "
+            "**Eggs and dairy are allowed** unless profile/notes rule them out. Across the week, include **both typical vegetarian plates** and "
+            "**vegan-friendly options or swaps** (e.g. tofu, legumes, plant milk) so vegan and vegetarian styles appear."
+        )
+    elif dp == "Non vegetarian":
+        out.append(
+            "**MEAL PROTEIN SCOPE — NON-VEGETARIAN (profile):** Use **animal proteins** through the week: **poultry, fish, eggs, dairy** as fits "
+            "the goal and calories. **No beef** (global rule below). Respect allergies and foods to avoid."
+        )
+    elif dp == "Pescatarian":
+        out.append(
+            "**MEAL PROTEIN SCOPE — PESCATARIAN:** Fish and seafood are allowed; **no poultry or red meat**. Eggs and dairy per profile/notes."
+        )
+    elif dp == "Flexitarian":
+        out.append(
+            "**MEAL PROTEIN SCOPE — FLEXITARIAN:** **Plant-forward** meals by default; add **modest fish, poultry, or eggs** only when it matches "
+            "the user’s notes or week request—not a meat-heavy plan every day unless they asked for it."
+        )
+    elif dp == "Other / mixed":
+        out.append(
+            "**MEAL PROTEIN SCOPE — OTHER / MIXED:** Follow the profile summary, **MEAL PROTEIN SCOPE** cues from coach chat, and the week request; "
+            "when instructions conflict, use the **stricter** food rules or the **most recent explicit user statement**."
+        )
+    else:
+        # Diet pattern not set — default vegetarian unless chat clearly says otherwise.
+        if chat_nonveg:
+            out.append(
+                "**MEAL PROTEIN SCOPE — NON-VEGETARIAN (from coach chat):** The user indicated **omnivore / non-vegetarian** eating in coach chat "
+                "(e.g. eats chicken, eggs, fish, or said they are not vegetarian). Plan meals with **poultry, fish, eggs, and dairy** as appropriate. "
+                "**No beef.** Still obey allergies and foods to avoid."
+            )
+        elif chat_vegan:
+            out.append(
+                "**MEAL PROTEIN SCOPE — VEGAN (from coach chat):** The user identified **vegan** (or fully plant-based only) in coach chat. "
+                "Use **only vegan** meals for the week."
+            )
+        else:
+            out.append(
+                "**MEAL PROTEIN SCOPE — VEGETARIAN (default):** Profile **diet pattern is not set** and chat does not establish omnivore. "
+                "Use **lacto-ovo vegetarian** meals for the whole week: **no meat, poultry, fish, or shellfish**; **eggs and dairy allowed**. "
+                "Include **vegan swaps or full vegan days** where natural. **Do not** add chicken, fish, or other meats unless the **week request** "
+                "explicitly asks for them."
+            )
+
+    if chat_nonveg and dp == "Vegetarian":
+        out.append(
+            "**Note:** Coach chat hints at eating meat while the profile is **Vegetarian**—keep this week’s meals **vegetarian** unless the **week request** "
+            "explicitly overrides; you may add one short line suggesting they update their profile if their diet changed."
+        )
+    if chat_vegan and dp in ("Non vegetarian", "Pescatarian", "Flexitarian"):
+        out.append(
+            "**Note:** Coach chat mentions **vegan**-style eating while the profile allows animal foods—**follow the profile’s protein scope** for this plan "
+            "unless the week request clearly asks for a vegan week."
+        )
+
+    if nuance:
+        out.append(
+            "**User-stated dietary detail (honour in every meal line, including protein choices and swaps):** "
+            + nuance
+        )
+    return out
+
+
+def format_coach_chat_for_week_plan(
+    messages: list[dict[str, Any]],
+    *,
+    max_messages: int = 36,
+    max_total_chars: int = 4500,
+) -> str:
+    """Chronological excerpt of coach chat for the weekly-plan model (diet preferences, constraints)."""
+    if not messages:
+        return ""
+    tail = messages[-max_messages:]
+    parts: list[str] = []
+    for r in tail:
+        role = (r.get("role") or "").strip()
+        if role not in ("user", "assistant"):
+            continue
+        c = (r.get("content") or "").strip().replace("\n", " ")
+        if len(c) > 520:
+            c = c[:520] + "…"
+        parts.append(f"- **{role}:** {c}")
+    blob = "\n".join(parts)
+    if len(blob) > max_total_chars:
+        blob = "…(older messages omitted)\n" + blob[-max_total_chars:]
+    return blob
 
 
 def diet_nuance_blob_from_profile(profile: dict) -> str:
@@ -107,12 +248,19 @@ def generate_week_plan_markdown(
     profile_blurb: str,
     user_request: str,
     nutrition_instructions: str = "",
+    coach_chat_block: str = "",
 ) -> str:
     nut = (
         f"\n\n=== NUTRITION / CALORIE RULES FOR THIS WEEK ===\n{nutrition_instructions.strip()}\n"
         if (nutrition_instructions or "").strip()
         else ""
     )
+    chat_sec = ""
+    if (coach_chat_block or "").strip():
+        chat_sec = (
+            "\n\n=== RECENT COACH CHAT (newest at bottom; use for diet preferences, dislikes, and constraints) ===\n"
+            f"{coach_chat_block.strip()}\n"
+        )
     prompt = f"""You are a strength and conditioning coach and practical meal-planning assistant
 (informational only; not medical advice; user should verify allergens and medical diet with a professional).
 
@@ -121,14 +269,14 @@ User profile (respect injuries, health conditions, exercise frequency, diet patt
 
 User request for this week:
 {user_request}
-{nut}
+{nut}{chat_sec}
 
 Produce EXACTLY a **7-day** block. Each day MUST use this exact outer delimiter and **inner structure**:
 
 ---DAY 1---
 #### Training
 - Exercise lines (e.g. "- Barbell deadlift: 3 sets x 6 reps" or "- Bodyweight squat: 20 reps")
-- 4–8 concrete exercises with sets/reps or time unless this is a rest/recovery day.
+- **At least 4** concrete exercises with sets/reps or time on each training day (so each can be illustrated); 4–8 total unless this is a rest/recovery day.
 - Optional: one short line on rest or RPE.
 
 #### Meals
@@ -161,14 +309,12 @@ Rules (meals):
 - **Vary the Day total sentence** each day: different verbs, length, and tone (sometimes one clause, sometimes two; never paste the same
   explanation seven times).
 - Align meals with **training vs rest** (e.g. slightly more carbs around harder training days when appropriate; still respect calorie rules).
-- **Diet pattern is mandatory for every meal line:** Follow **NUTRITION / CALORIE RULES** and the profile summary exactly.
-  - If the profile says **Vegetarian**: **no meat, poultry, fish, or shellfish** in any meal. **Eggs and dairy are allowed** unless the profile or notes say otherwise (e.g. vegan, no eggs, plant-only). If the user notes they are vegetarian **and eat eggs** (or similar), treat them as **lacto-ovo vegetarian**: use **eggs** and dairy as primary proteins where appropriate and mention that pattern briefly in the week.
-  - If **Vegan**: no animal products (no meat, fish, dairy, eggs, honey); use legumes, tofu, tempeh, nuts, seeds, plant milks.
-  - If **Pescatarian**: fish/seafood OK; no other meat; respect eggs/dairy per notes.
-  - If **Non vegetarian** / omnivore: poultry, fish, eggs, dairy, legumes, etc. are OK (still **no beef**—see below).
-- Respect **allergy alerts** and **foods to avoid**; use **cuisine / country** hints when helpful. Merge any **coach notes** or **meal timing** details that refine diet (e.g. "vegetarian but eats eggs") into actual meal choices and wording.
+- **Meal protein scope is mandatory:** The block **NUTRITION / CALORIE RULES** includes a **MEAL PROTEIN SCOPE** line—follow it **exactly** for every breakfast, lunch, and dinner (vegan-only, vegetarian with optional vegan swaps, default vegetarian when unset, or non-vegetarian with poultry/fish/eggs/dairy when scope says so). **Coach chat** may refine wording and swaps; do not contradict the scope unless the **week request** explicitly overrides.
+- **Indian-first meals and fats:** Apply **Cuisine — Indian-first** and **Cooking oils** from **NUTRITION / CALORIE RULES**: mostly Indian dishes and methods; **cold-pressed** oils (mustard, groundnut, sesame, coconut as fits); **no refined oil** as the default; **do not use olive oil** for typical **high-heat Indian cooking** (tadka, bhuna, deep-fry)—it is a poor match for that style.
+- Respect **allergy alerts** and **foods to avoid**; use **cuisine / country** hints when helpful. Merge **coach notes**, **meal timing**, and **coach chat** details into actual meal choices.
 - **Never include beef** in any meal suggestion (no beef, steak, ground beef, beef mince, beef jerky, beef broth/stock from beef, or beef-based
   sauces as the main protein). When meat is allowed, use poultry, fish, eggs, dairy (if diet allows), legumes, tofu/tempeh, lamb, pork, or other proteins instead.
+- **No standalone tips block:** Do **not** add a separate section (e.g. "Tips," "General advice") to the 7-day output. Follow **sugar / processing / embedded habits** rules in **NUTRITION / CALORIE RULES** by working them **into** meal lines only.
 - Keep language practical (grocery-realistic); no medical claims.
 
 Formatting:
@@ -242,6 +388,42 @@ def is_likely_rest_or_home_day(body: str) -> bool:
     return any(h in b for h in home_recovery)
 
 
+def four_exercise_focus_lines(day_body: str) -> list[str]:
+    """Exactly four short strings for image prompts (exercises or rest-day variations)."""
+    w_img = workout_body_for_image(day_body)
+    if is_likely_rest_or_home_day(w_img):
+        base = (w_img.strip()[:900] or "Light recovery or rest at home.").strip()
+        return [
+            f"{base}\n\n(Variation {i + 1}/4: different calm pose or area of the home; same person.)"
+            for i in range(4)
+        ]
+    t = training_section_text(day_body)
+    bullets: list[str] = []
+    for line in t.splitlines():
+        s = line.strip()
+        bm = re.match(r"^[-*•]\s+(.+)$", s)
+        if bm:
+            txt = bm.group(1).strip()
+            if txt:
+                bullets.append(txt[:400])
+        elif s.startswith("**") and (
+            "REST" in s.upper()
+            or "RECOVERY" in s.upper()
+        ):
+            bullets.append(s[:400])
+    if len(bullets) >= 4:
+        return bullets[:4]
+    if not bullets:
+        fb = (t[:550] or w_img[:550]).strip() or "Gym strength training."
+        return [
+            f"{fb}\n\n(Panel {i + 1}/4: one clear exercise or station from this day.)"
+            for i in range(4)
+        ]
+    while len(bullets) < 4:
+        bullets.append(f"{bullets[-1]} (different angle or equipment setup.)")
+    return bullets[:4]
+
+
 def _gender_phrase(gender: str) -> str:
     g = (gender or "").strip().lower()
     if g == "male":
@@ -304,6 +486,62 @@ Natural lighting, sharp focus, authentic gym background, full-body or three-quar
     )
 
 
+def build_single_exercise_image_prompt(
+    day_num: int,
+    slot_1_to_4: int,
+    exercise_focus: str,
+    has_reference_face: bool,
+    gender: str,
+    physique_descriptor: str = "",
+    *,
+    at_home: bool = False,
+) -> str:
+    """One panel of a 4-up day: single movement or rest variation, same person/build as other panels."""
+    ex = (exercise_focus or "").strip()[:700]
+    phys = (physique_descriptor or "").strip()
+    body_line = (
+        f"\n\nBody build (match other panels this week for the same person): {phys}"
+        if phys
+        else ""
+    )
+    panel = f"Panel {slot_1_to_4}/4 for Day {day_num}."
+
+    if at_home:
+        scene = f"""Photorealistic photo at home — NOT a gym. {panel}
+Focus on this moment only:
+{ex}
+{body_line}
+
+Comfortable casual or light activewear, believable residential space, warm natural light.
+Full-body or three-quarter view. No text overlays, no readable logos."""
+        face_suffix = (
+            " The first reference image is a portrait: keep this same person's face and age; same individual."
+            if has_reference_face
+            else (
+                f" Single anonymous fictional person of Indian ethnicity, typical {_gender_phrase(gender)} presentation; "
+                "generic invented face; photorealistic."
+            )
+        )
+        return scene + " " + face_suffix
+
+    scene = f"""Photorealistic photo in a modern, well-lit gym. {panel}
+Show one clear exercise or setup that matches:
+{ex}
+{body_line}
+
+Authentic equipment and background, natural lighting, full-body or three-quarter view. No text overlays, no readable logos."""
+    if has_reference_face:
+        return (
+            scene
+            + " Reference portrait provided: match face, age, and skin tone; **match body size to the build line**; same individual."
+        )
+    gp = _gender_phrase(gender)
+    return (
+        scene
+        + f" Single anonymous fictional person of Indian ethnicity, typical {gp} presentation; generic invented face; photorealistic."
+    )
+
+
 def extract_image_bytes_from_genai_response(response: Any) -> bytes | None:
     cands = getattr(response, "candidates", None) or []
     for c in cands:
@@ -334,10 +572,9 @@ def _generate_day_image_euri_openai(
     api_key: str,
     base_url: str,
     model_id: str,
-    day_num: int,
-    exercise_text: str,
-    gender: str,
-    physique_descriptor: str = "",
+    prompt: str,
+    *,
+    size: str = "1024x1024",
 ) -> tuple[bytes | None, str | None]:
     """EURI images API (OpenAI-style); prompt-only, no reference photo."""
     import base64
@@ -346,16 +583,13 @@ def _generate_day_image_euri_openai(
 
     from openai import OpenAI
 
-    prompt = build_image_prompt(
-        day_num, exercise_text, False, gender, physique_descriptor=physique_descriptor
-    )
     client = OpenAI(api_key=api_key, base_url=base_url.rstrip("/"))
     try:
         resp = client.images.generate(
             model=model_id,
             prompt=prompt,
             n=1,
-            size="1024x1024",
+            size=size,
             response_format="b64_json",
         )
     except Exception as exc:
@@ -386,12 +620,9 @@ def _generate_day_image_euri_openai(
 def _generate_day_image_once(
     api_key: str,
     model_id: str,
-    day_num: int,
-    exercise_text: str,
+    prompt: str,
     reference_image_bytes: bytes | None,
     reference_mime: str,
-    gender: str,
-    physique_descriptor: str = "",
 ) -> tuple[bytes | None, str | None]:
     """Google Gemini native image output (multimodal; optional reference face)."""
     from google import genai
@@ -399,13 +630,6 @@ def _generate_day_image_once(
 
     client = genai.Client(api_key=api_key)
     has_ref = bool(reference_image_bytes)
-    prompt = build_image_prompt(
-        day_num,
-        exercise_text,
-        has_ref,
-        gender,
-        physique_descriptor=physique_descriptor,
-    )
     parts: list[Any] = []
     if has_ref:
         parts.append(
@@ -432,6 +656,60 @@ def _generate_day_image_once(
     return img, None
 
 
+def _generate_routed_image(
+    prompt: str,
+    api_key: str,
+    model_id: str,
+    reference_image_bytes: bytes | None,
+    reference_mime: str,
+    base_url: str | None,
+    fallback_api_key: str | None,
+    fallback_base_url: str | None,
+    *,
+    euri_size: str = "1024x1024",
+) -> tuple[bytes | None, str | None]:
+    """Shared EURI vs Gemini routing (reference face prefers Gemini when both keys exist)."""
+    prim = (api_key or "").strip()
+    fb = (fallback_api_key or "").strip()
+    has_ref = bool(reference_image_bytes)
+    bu = (base_url or "").strip() or None
+
+    if bu:
+        if has_ref and fb:
+            img, err = _generate_day_image_once(
+                fb, model_id, prompt, reference_image_bytes, reference_mime
+            )
+            if img:
+                return img, None
+            img2, err2 = _generate_day_image_euri_openai(
+                prim, bu, model_id, prompt, size=euri_size
+            )
+            if img2:
+                return img2, None
+            return None, (err2 or err or "Image generation failed.")
+
+        img, err = _generate_day_image_euri_openai(
+            prim, bu, model_id, prompt, size=euri_size
+        )
+        if img:
+            return img, None
+        return None, err
+
+    img, err = _generate_day_image_once(
+        prim, model_id, prompt, reference_image_bytes, reference_mime
+    )
+    if img:
+        return img, None
+    if fb and fb != prim and err and _looks_like_invalid_google_api_key(err):
+        img2, err2 = _generate_day_image_once(
+            fb, model_id, prompt, reference_image_bytes, reference_mime
+        )
+        if img2:
+            return img2, None
+        return None, err2 or err
+    return None, err
+
+
 def generate_day_image(
     api_key: str,
     model_id: str,
@@ -445,83 +723,67 @@ def generate_day_image(
     fallback_base_url: str | None = None,
     physique_descriptor: str = "",
 ) -> tuple[bytes | None, str | None]:
-    """Images: EURI uses OpenAI-style ``images/generations`` (no reference face).
-
-    If a **profile reference photo** is present and **GEMINI_API_KEY** is available as
-    ``fallback_api_key`` while the primary route is EURI, we call **Google multimodal**
-    first so the generated face can match the reference; then fall back to EURI on failure.
-    """
-    prim = (api_key or "").strip()
-    fb = (fallback_api_key or "").strip()
+    """One composite day image (legacy / optional). Uses full-day prompt and 1024 EURI size."""
     has_ref = bool(reference_image_bytes)
-
-    if base_url:
-        if has_ref and fb:
-            img, err = _generate_day_image_once(
-                fb,
-                model_id,
-                day_num,
-                exercise_text,
-                reference_image_bytes,
-                reference_mime,
-                gender,
-                physique_descriptor=physique_descriptor,
-            )
-            if img:
-                return img, None
-            img2, err2 = _generate_day_image_euri_openai(
-                prim,
-                base_url,
-                model_id,
-                day_num,
-                exercise_text,
-                gender,
-                physique_descriptor=physique_descriptor,
-            )
-            if img2:
-                return img2, None
-            return None, (err2 or err or "Image generation failed.")
-
-        img, err = _generate_day_image_euri_openai(
-            prim,
-            base_url,
-            model_id,
-            day_num,
-            exercise_text,
-            gender,
-            physique_descriptor=physique_descriptor,
-        )
-        if img:
-            return img, None
-        return None, err
-
-    img, err = _generate_day_image_once(
-        prim,
-        model_id,
+    prompt = build_image_prompt(
         day_num,
         exercise_text,
-        reference_image_bytes,
-        reference_mime,
+        has_ref,
         gender,
         physique_descriptor=physique_descriptor,
     )
-    if img:
-        return img, None
-    if fb and fb != prim and err and _looks_like_invalid_google_api_key(err):
-        img2, err2 = _generate_day_image_once(
-            fb,
-            model_id,
-            day_num,
-            exercise_text,
-            reference_image_bytes,
-            reference_mime,
-            gender,
-            physique_descriptor=physique_descriptor,
-        )
-        if img2:
-            return img2, None
-        return None, err2 or err
-    return None, err
+    return _generate_routed_image(
+        prompt,
+        api_key,
+        model_id,
+        reference_image_bytes,
+        reference_mime,
+        base_url,
+        fallback_api_key,
+        fallback_base_url,
+        euri_size="1024x1024",
+    )
+
+
+def generate_workout_slot_image(
+    api_key: str,
+    model_id: str,
+    day_num: int,
+    slot_1_to_4: int,
+    exercise_focus: str,
+    reference_image_bytes: bytes | None,
+    reference_mime: str,
+    gender: str,
+    base_url: str | None = None,
+    fallback_api_key: str | None = None,
+    fallback_base_url: str | None = None,
+    physique_descriptor: str = "",
+    *,
+    at_home: bool,
+    euri_size: str = "512x512",
+) -> tuple[bytes | None, str | None]:
+    """One of four exercise panels for a day; smaller default EURI size for a 2×2 layout."""
+    has_ref = bool(reference_image_bytes)
+    prompt = build_single_exercise_image_prompt(
+        day_num,
+        slot_1_to_4,
+        exercise_focus,
+        has_ref,
+        gender,
+        physique_descriptor=physique_descriptor,
+        at_home=at_home,
+    )
+    return _generate_routed_image(
+        prompt,
+        api_key,
+        model_id,
+        reference_image_bytes,
+        reference_mime,
+        base_url,
+        fallback_api_key,
+        fallback_base_url,
+        euri_size=euri_size,
+    )
 
 
 def default_image_model() -> str:

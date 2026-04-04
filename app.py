@@ -452,6 +452,23 @@ def _query_param_single(key: str) -> str | None:
     return str(v)
 
 
+_verify_email_tok = _query_param_single("verify_email")
+if _verify_email_tok:
+    st.title("Activate your account")
+    uid_verify = db.try_consume_email_verification_token(_verify_email_tok)
+    if uid_verify is None:
+        st.error(
+            "This activation link is invalid or has expired. After 1 hour you can use **Register** again "
+            "with the same email and password to receive a new link. If you already used this link, sign in."
+        )
+    else:
+        st.success("Your account is activated. You can sign in below.")
+        try:
+            st.query_params.clear()
+        except Exception:
+            pass
+    st.stop()
+
 _reset_tok = _query_param_single("reset_token")
 if _reset_tok:
     st.title("Set a new password")
@@ -567,6 +584,8 @@ or what to eat to reach a fitness goal:
 - If country or goal is unclear, ask briefly or offer a default and label it as such. Never prescribe
   clinical therapeutic diets.
 - **Never recommend beef** (steak, ground beef, beef dishes, beef broth/stock, etc.) in meal ideas or swaps; use other proteins instead.
+- **No separate “tips” blocks:** When giving **advice** or **meal/week plans**, **do not** add a standalone section labeled tips, reminders, or general wellness. Fold useful ideas **into** the same sentences as meals or guidance.
+- **Plans and everyday advice:** **Do not** put **refined sugar**, sweets, candy, or **sugar-sweetened drinks** in plans as **routine** items; **minimize ultra-processed** packaged foods as staples—prefer whole-food-style meals. Where natural, shape examples toward **protein + fibre** at lunch/dinner, a **protein-forward breakfast** when suitable, **lighter dinners** or veg soup on some days, **first food after fasting/morning** leaning **protein or healthy fat** rather than pure sugar/refined high-carb alone, and a **short easy walk ~10 min after eating** (10–15 min) **only as a brief inline phrase** when it fits—not a labeled list. Not medical advice.
 
 GOAL TIMELINE & PROGRESS: A **GOAL TIMELINE** section lists dated moments when the user changed **Primary nutrition goal** in their profile or sent a **goal-related message** in this chat. Each row may include a **weight/height snapshot** captured at that moment. Use it together with **WEIGHT HISTORY** and **WEIGHT TREND** to:
 - Summarise how long they have been pursuing the current (or a past) goal and what changed over that **period**.
@@ -588,6 +607,14 @@ def profile_to_blurb(p: dict) -> str:
         lines.append(f"Email: {p['email']}")
     if p.get("gender"):
         lines.append(f"Gender (profile): {p['gender']}")
+    ag = p.get("age_years")
+    if ag is not None:
+        try:
+            ai = int(float(ag))
+            if 0 < ai <= 120:
+                lines.append(f"Age (years): {ai}")
+        except (TypeError, ValueError):
+            pass
     bw = p.get("body_weight_kg")
     if bw is not None:
         try:
@@ -1082,59 +1109,11 @@ def estimate_tdee_from_profile(
         return None, None
 
 
-def _weekly_plan_diet_constraint_lines(p: dict) -> list[str]:
-    """Hard rules injected into weekly plan nutrition instructions (matches profile diet_pattern)."""
-    dp = (p.get("diet_pattern") or "").strip()
-    if dp == "Omnivore":
-        dp = "Non vegetarian"
-    nuance = workout_plan.diet_nuance_blob_from_profile(p)
-    out: list[str] = []
-
-    if dp == "Vegetarian":
-        out.append(
-            "**Mandatory — Vegetarian:** Every breakfast, lunch, and dinner must be **fully vegetarian**: "
-            "no meat, poultry, fish, shellfish, or other animal flesh. **Eggs and dairy are allowed** unless "
-            "the profile or notes explicitly rule them out (e.g. vegan, no eggs, plant-based only). If the user "
-            "states they are vegetarian **and still eat eggs** (or similar), treat as **lacto-ovo vegetarian**: "
-            "use eggs and dairy as primary proteins where appropriate and reflect that in meal wording."
-        )
-    elif dp == "Vegan":
-        out.append(
-            "**Mandatory — Vegan:** No animal products of any kind—no meat, fish, poultry, dairy, eggs, or honey. "
-            "Use legumes, tofu, tempeh, nuts, seeds, and plant-based alternatives only."
-        )
-    elif dp == "Pescatarian":
-        out.append(
-            "**Mandatory — Pescatarian:** Fish and seafood are allowed; **no poultry or red meat**. "
-            "Eggs and dairy follow the profile and notes."
-        )
-    elif dp == "Flexitarian":
-        out.append(
-            "**Flexitarian:** Emphasize plant-forward meals; use fish or small amounts of animal protein only when "
-            "consistent with the user's notes—not as the default every day unless their request says otherwise."
-        )
-    elif dp == "Other / mixed":
-        out.append(
-            "**Diet pattern — Other / mixed:** Follow every dietary detail in the profile summary and in the "
-            "**User-stated dietary detail** line below; when instructions conflict, use the stricter or more "
-            "specific user wording."
-        )
-    elif dp in ("Non vegetarian", ""):
-        pass
-    else:
-        out.append(
-            f"**Diet pattern ({dp}):** Align all meals with this pattern and with the user notes below."
-        )
-
-    if nuance:
-        out.append(
-            "**User-stated dietary detail (honour in every meal line, including protein choices and swaps):** "
-            + nuance
-        )
-    return out
-
-
-def build_week_plan_nutrition_block(p: dict, weight_rows: list) -> str:
+def build_week_plan_nutrition_block(
+    p: dict,
+    weight_rows: list,
+    coach_messages: list[dict] | None = None,
+) -> str:
     """TDEE anchor + goal-based calorie rules for the weekly meal section of the plan."""
     lines: list[str] = []
     bmr, tdee_prof = estimate_tdee_from_profile(p)
@@ -1162,9 +1141,18 @@ def build_week_plan_nutrition_block(p: dict, weight_rows: list) -> str:
             f"weight log{extra}. Use this number when judging whether daily meal totals are below/at/above maintenance."
         )
     elif tdee_prof is not None and bmr is not None:
+        _age_td = 30
+        _ayp = p.get("age_years")
+        if _ayp is not None:
+            try:
+                _ai_td = int(float(_ayp))
+                if 14 <= _ai_td <= 100:
+                    _age_td = _ai_td
+            except (TypeError, ValueError):
+                pass
         lines.append(
             f"Estimated **maintenance (TDEE)** from profile: **~{round(tdee_prof)} kcal/day** "
-            f"(BMR ~{round(bmr)} kcal/day via Mifflin–St Jeor, age {30}, activity from profile). "
+            f"(BMR ~{round(bmr)} kcal/day via Mifflin–St Jeor, age {_age_td}, activity from profile). "
             "Use this as the maintenance reference for meal-day calorie totals."
         )
     else:
@@ -1198,7 +1186,25 @@ def build_week_plan_nutrition_block(p: dict, weight_rows: list) -> str:
             "**Primary goal not set:** Use balanced meals; if TDEE is known, keep days near maintenance unless the user request implies otherwise."
         )
 
-    lines.extend(_weekly_plan_diet_constraint_lines(p))
+    _user_chat_lines: list[str] = []
+    if coach_messages:
+        for _m in coach_messages:
+            if (_m.get("role") or "") == "user" and (_m.get("content") or "").strip():
+                _user_chat_lines.append(str(_m["content"]).strip())
+    lines.extend(workout_plan.meal_plan_diet_scope_lines(p, _user_chat_lines))
+    lines.append(
+        "**Cuisine — Indian-first:** For **most** breakfasts, lunches, and dinners, use **Indian foods and Indian-style cooking** "
+        "(any region: e.g. roti or rice with dal/sabzi, idli/dosa, poha, upma, khichdi, rajma, chole, paratha, curries, tandoori-style "
+        "bakes, regional breads and grains). Follow the **MEAL PROTEIN SCOPE** above. Only shift to a **non-Indian** menu for most days "
+        "if the **week request** or **coach chat** clearly asks for another cuisine for this plan."
+    )
+    lines.append(
+        "**Cooking oils:** Recommend **cold-pressed** oils appropriate to the dish (e.g. cold-pressed **mustard**, **groundnut/peanut**, "
+        "**sesame**, or **coconut** oil). **Do not** suggest **refined** vegetable/seed oils as the everyday default. "
+        "**Avoid olive oil for typical Indian high-heat steps** (tadka, bhuna, deep-frying, long sauté at high heat)—it is **not ideal** for "
+        "Indian-style cooking in those roles. If olive oil is mentioned at all, restrict to **low-heat** or **uncooked** uses, not as the main "
+        "cooking fat for Indian recipes."
+    )
     lines.append(
         "Obey **allergy alerts** and **foods to avoid** in every breakfast, lunch, and dinner."
     )
@@ -1208,6 +1214,13 @@ def build_week_plan_nutrition_block(p: dict, weight_rows: list) -> str:
     lines.append(
         "**Human variety:** Day totals and the closing one-liner under **Day total** must differ across the seven days—vary calories slightly "
         "day to day (within goal rules) and rephrase; avoid repeating the same sentence or the same kcal total every day."
+    )
+    lines.append(
+        "**Sugar, processing, and embedded habits (no separate tips section):** Do **not** list **refined sugar**, sweets, candy, or **sugar-sweetened beverages** "
+        "as **everyday** breakfast/lunch/dinner/snack items across the week. **Minimize ultra-processed** packaged foods as staples. Build from **whole ingredients**. "
+        "**Weave** sensible patterns **only inside** meal lines or short day phrases when natural—**not** as a titled tips block: **protein + fibre** at meals; "
+        "**protein-rich breakfast** where suitable; **lighter dinner** or veg soup on some days; after overnight fast or morning, **first foods** favour **protein or healthy fat** "
+        "over a sugary/refined-carb-only start; optionally mention a **10–15 min easy walk starting ~10 min after** a meal in passing. Not medical advice."
     )
     return "\n".join(lines)
 
@@ -1477,7 +1490,7 @@ def render_main_content() -> None:
 
             with st.form("profile_form"):
                 st.markdown("##### Personal")
-                c1, c2 = st.columns(2)
+                c1, c2, c3 = st.columns(3)
                 with c1:
                     full_name = st.text_input(
                         "Full name",
@@ -1491,6 +1504,23 @@ def render_main_content() -> None:
                         ["", "Male", "Female", "Non-binary", "Prefer not to say"],
                         index=_gender_index(prof.get("gender")),
                         label_visibility="collapsed",
+                    )
+                with c3:
+                    _age_disp = ""
+                    _ay0 = prof.get("age_years")
+                    if _ay0 is not None:
+                        try:
+                            _a_int = int(float(_ay0))
+                            if 0 < _a_int <= 120:
+                                _age_disp = str(_a_int)
+                        except (TypeError, ValueError):
+                            pass
+                    age_text = st.text_input(
+                        "Age (optional)",
+                        value=_age_disp,
+                        placeholder="e.g. 34",
+                        help="Whole years. Leave blank if you prefer not to say.",
+                        key="profile_age_optional",
                     )
                 login_mail = (db.get_username(uid) or "").strip()
                 _ph_place = db.is_phone_placeholder_account(uid)
@@ -1683,6 +1713,17 @@ def render_main_content() -> None:
                     _save_errs.append("gender must be selected")
                 elif (gender or "").strip() not in REQUIRED_GENDERS:
                     _save_errs.append("gender must be one of the listed options")
+                _age_store: int | None = None
+                _at = (age_text or "").strip()
+                if _at:
+                    if not _at.isdigit():
+                        _save_errs.append("age must be a whole number (e.g. 34) or left blank")
+                    else:
+                        _ai = int(_at)
+                        if _ai < 1 or _ai > 120:
+                            _save_errs.append("age must be between 1 and 120 or left blank")
+                        else:
+                            _age_store = _ai
                 if _save_errs:
                     st.error("Cannot save profile: " + "; ".join(_save_errs) + ".")
                 else:
@@ -1714,6 +1755,7 @@ def render_main_content() -> None:
                                 "full_name": full_name.strip(),
                                 "email": sync_email,
                                 "gender": gender.strip(),
+                                "age_years": _age_store,
                                 "body_weight_kg": float(body_weight_kg),
                                 "height_feet": float(height_feet),
                                 "activity_level": activity_level,
@@ -1767,14 +1809,20 @@ def render_main_content() -> None:
             )
             gen_wo = st.button("Generate 7-day plan", key="btn_workout_week")
             if st.session_state.pop("workout_week_just_generated", False):
-                st.success("Training plan, meals, and images updated below.")
+                st.success(
+                    "Training plan, meals, and images updated below (four exercise visuals per day)."
+                )
             if gen_wo and not (wo_ctx or "").strip():
                 st.warning("Describe your goals or constraints above, then generate again.")
             elif gen_wo:
                 _prof = db.get_profile(uid)
                 prof_blurb = profile_to_blurb(_prof)
                 _weights = db.list_weight_entries(uid, 30)
-                _nut_block = build_week_plan_nutrition_block(_prof, _weights)
+                _coach_hist = db.list_chat_messages(uid, 40)
+                _nut_block = build_week_plan_nutrition_block(
+                    _prof, _weights, coach_messages=_coach_hist
+                )
+                _chat_for_plan = workout_plan.format_coach_chat_for_week_plan(_coach_hist)
                 plan_md = ""
                 try:
                     with st.spinner("Generating training + meal plan for the week…"):
@@ -1783,6 +1831,7 @@ def render_main_content() -> None:
                             prof_blurb,
                             wo_ctx.strip(),
                             nutrition_instructions=_nut_block,
+                            coach_chat_block=_chat_for_plan,
                         )
                 except Exception as exc:
                     st.error(f"Workout text failed: {exc}")
@@ -1845,32 +1894,47 @@ def render_main_content() -> None:
                             _wk_float,
                             gender_p,
                         )
-                        imgs: dict[int, bytes] = {}
-                        errs: dict[int, str] = {}
+                        imgs: dict[int, list[bytes | None]] = {}
+                        errs: dict[int, list[str | None]] = {}
+                        _total_slots = 7 * 4
+                        _slot_euri = os.getenv("WORKOUT_SLOT_EURI_SIZE", "512x512").strip() or "512x512"
                         bar = st.progress(0.0, text="Generating your personalised plan…")
-                        for i, (dn, body) in enumerate(days_list):
+                        done = 0
+                        for dn, body in days_list:
                             _img_body = workout_plan.workout_body_for_image(body)
-                            b, err = workout_plan.generate_day_image(
-                                img_api,
-                                img_model,
-                                dn,
-                                _img_body,
-                                ref_bytes,
-                                ref_mime,
-                                gender_p,
-                                base_url=img_base,
-                                fallback_api_key=img_key_fallback,
-                                fallback_base_url=img_fb_base,
-                                physique_descriptor=_physique,
-                            )
-                            if b:
-                                imgs[dn] = b
-                            else:
-                                errs[dn] = err or "Unknown error"
-                            bar.progress(
-                                (i + 1) / 7.0,
-                                text="Generating day images…",
-                            )
+                            _at_home = workout_plan.is_likely_rest_or_home_day(_img_body)
+                            focuses = workout_plan.four_exercise_focus_lines(body)
+                            day_imgs: list[bytes | None] = [None, None, None, None]
+                            day_errs: list[str | None] = [None, None, None, None]
+                            for si, focus in enumerate(focuses, start=1):
+                                idx = si - 1
+                                b, err = workout_plan.generate_workout_slot_image(
+                                    img_api,
+                                    img_model,
+                                    dn,
+                                    si,
+                                    focus,
+                                    ref_bytes,
+                                    ref_mime,
+                                    gender_p,
+                                    base_url=img_base,
+                                    fallback_api_key=img_key_fallback,
+                                    fallback_base_url=img_fb_base,
+                                    physique_descriptor=_physique,
+                                    at_home=_at_home,
+                                    euri_size=_slot_euri,
+                                )
+                                if b:
+                                    day_imgs[idx] = b
+                                else:
+                                    day_errs[idx] = err or "Unknown error"
+                                done += 1
+                                bar.progress(
+                                    done / float(_total_slots),
+                                    text=f"Day {dn} images ({si}/4)…",
+                                )
+                            imgs[dn] = day_imgs
+                            errs[dn] = day_errs
                         bar.empty()
                         st.session_state["workout_week_images"] = imgs
                         st.session_state["workout_week_image_errors"] = errs
@@ -1889,10 +1953,39 @@ def render_main_content() -> None:
                 for d, body in workout_plan.ensure_seven_days(blocks, fb):
                     st.markdown(f"###### Day {d}")
                     st.markdown(body or "_(No exercises parsed for this day.)_")
-                    if d in imgs:
-                        st.image(imgs[d], caption=f"Day {d}")
-                    elif errs.get(d):
-                        st.caption(f"Image unavailable: {errs[d]}")
+                    slot_imgs = imgs.get(d)
+                    slot_errs = errs.get(d) or []
+                    if slot_imgs is not None and isinstance(slot_imgs, list):
+                        st.caption("Training visuals — four panels (exercises for this day)")
+                        r1a, r1b = st.columns(2, gap="medium")
+                        r2a, r2b = st.columns(2, gap="medium")
+                        _panels = list(slot_imgs)
+                        while len(_panels) < 4:
+                            _panels.append(None)
+                        _perr = (
+                            list(slot_errs)
+                            if isinstance(slot_errs, list)
+                            else [None, None, None, None]
+                        )
+                        while len(_perr) < 4:
+                            _perr.append(None)
+                        for col, idx in ((r1a, 0), (r1b, 1), (r2a, 2), (r2b, 3)):
+                            with col:
+                                im = _panels[idx]
+                                if im:
+                                    st.image(
+                                        im,
+                                        caption=f"Exercise visual {idx + 1}",
+                                        use_container_width=True,
+                                    )
+                                elif _perr[idx]:
+                                    st.caption(
+                                        f"Panel {idx + 1} unavailable: {_perr[idx]}"
+                                    )
+                    elif slot_imgs is not None and isinstance(slot_imgs, bytes):
+                        st.image(slot_imgs, caption=f"Day {d}", use_container_width=True)
+                    elif isinstance(slot_errs, str) and slot_errs.strip():
+                        st.caption(f"Image unavailable: {slot_errs}")
 
     st.subheader("Daily calorie needs")
     _daily_bw_default = 0.0
@@ -1939,6 +2032,14 @@ def render_main_content() -> None:
     sex_choice = "Average (midpoint)"
     if uid and active:
         _p_bmr = db.get_profile(uid)
+        _ay_bmr = _p_bmr.get("age_years")
+        if _ay_bmr is not None:
+            try:
+                _yi = int(float(_ay_bmr))
+                if 14 <= _yi <= 100:
+                    age_years = _yi
+            except (TypeError, ValueError):
+                pass
         try:
             _hft = _p_bmr.get("height_feet")
             if _hft is not None and float(_hft) > 0:
@@ -2312,11 +2413,16 @@ else:
                 if not db.is_valid_login_email(raw_e):
                     st.error("Enter a valid sign-in email address.")
                 else:
-                    found = db.verify_user_identifier(raw_e, lp)
+                    found, why_fail = db.try_email_password_sign_in(raw_e, lp)
                     if found:
                         st.session_state.user_id = found
                         st.session_state.username = db.get_username(found)
                         st.rerun()
+                    elif why_fail == "unverified":
+                        st.error(
+                            "Activate your account first—open the link we sent to your email "
+                            "(valid 1 hour). After it expires you can register again with the same email."
+                        )
                     else:
                         st.error("Invalid email or password.")
 
@@ -2363,7 +2469,10 @@ else:
                                 "Nothing else is shown for privacy."
                             )
         with tab_reg:
-            st.caption("Create an account with your **email** and a password.")
+            st.caption(
+                "Create an account with your **email** and a password. We will email you an "
+                "activation link (valid **1 hour**); you can sign in only after you open it."
+            )
             reg_em = st.text_input(
                 "Email",
                 key="reg_unified_email",
@@ -2385,15 +2494,42 @@ else:
                         st.error("Enter your email address.")
                     elif not db.is_valid_login_email(em):
                         st.error("Please enter a valid email address.")
+                    elif not mailer.smtp_configured():
+                        st.error(
+                            "Registration needs email activation. Configure SMTP in `.env` "
+                            "(SMTP_SERVER, SMTP_USERNAME, SMTP_PASSWORD, MAIL_DEFAULT_SENDER) "
+                            "or ask your administrator."
+                        )
                     else:
                         ok, msg = db.create_user(em, rp)
-                        if ok:
+                        if not ok:
+                            st.error(msg)
+                        else:
                             uid_new = db.get_user_id_by_login_email(em)
-                            if uid_new:
+                            if not uid_new:
+                                st.error("Registration failed unexpectedly. Try again.")
+                            else:
                                 db.upsert_profile(
                                     uid_new,
                                     {"email": db.normalize_login_email(em)},
                                 )
-                            st.success(msg)
-                        else:
-                            st.error(msg)
+                                base_reg = (
+                                    os.getenv("PASSWORD_RESET_APP_URL") or "http://localhost:8501"
+                                ).rstrip("/")
+                                send_err: str | None = None
+                                try:
+                                    vtok = db.create_email_verification_token(uid_new)
+                                    vlink = f"{base_reg}?verify_email={vtok}"
+                                    mailer.send_email_verification_email(
+                                        db.normalize_login_email(em), vlink
+                                    )
+                                except Exception as exc:
+                                    send_err = str(exc)
+                                if send_err:
+                                    db.delete_user_account(uid_new)
+                                    st.error(f"Could not send activation email: {send_err}")
+                                else:
+                                    st.success(
+                                        "Check your email for the activation link. It expires in **1 hour**. "
+                                        "After you click it, sign in here with your email and password."
+                                    )

@@ -127,10 +127,22 @@ def init_db() -> None:
             );
             CREATE UNIQUE INDEX IF NOT EXISTS idx_password_reset_token_hash
                 ON password_reset_tokens (token_hash);
+
+            CREATE TABLE IF NOT EXISTS email_verification_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                token_hash TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                used_at TEXT
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verification_token_hash
+                ON email_verification_tokens (token_hash);
             """
         )
         _ensure_profile_columns(conn)
         _ensure_user_columns(conn)
+        _ensure_email_verified_column(conn)
         _ensure_goal_tracking_table(conn)
         _ensure_daily_activities_table(conn)
 
@@ -149,6 +161,15 @@ def _ensure_user_columns(conn: sqlite3.Connection) -> None:
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_e164 "
             "ON users(phone_e164) WHERE phone_e164 IS NOT NULL "
             "AND length(trim(phone_e164)) > 0"
+        )
+
+
+def _ensure_email_verified_column(conn: sqlite3.Connection) -> None:
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "email_verified_at" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN email_verified_at TEXT")
+        conn.execute(
+            "UPDATE users SET email_verified_at = created_at WHERE email_verified_at IS NULL"
         )
 
 
@@ -265,6 +286,8 @@ def _ensure_profile_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE profiles ADD COLUMN height_feet REAL")
     if "activity_level" not in cols:
         conn.execute("ALTER TABLE profiles ADD COLUMN activity_level TEXT DEFAULT ''")
+    if "age_years" not in cols:
+        conn.execute("ALTER TABLE profiles ADD COLUMN age_years INTEGER")
 
 
 def profile_image_path(user_id: int) -> Path:
@@ -289,8 +312,38 @@ def is_valid_login_email(email: str) -> bool:
     return bool(_LOGIN_EMAIL_RE.match(email.strip()))
 
 
+def is_user_email_verified(user_id: int) -> bool:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT email_verified_at FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+    if not row:
+        return False
+    v = row["email_verified_at"]
+    return v is not None and str(v).strip() != ""
+
+
+def has_unused_valid_verification_token(user_id: int) -> bool:
+    now = _utc_now_iso()
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT 1 FROM email_verification_tokens
+            WHERE user_id = ? AND used_at IS NULL AND expires_at > ?
+            LIMIT 1
+            """,
+            (user_id, now),
+        ).fetchone()
+    return row is not None
+
+
+def delete_user_account(user_id: int) -> None:
+    with get_conn() as conn:
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+
+
 def create_user(login_email: str, password: str) -> tuple[bool, str]:
-    """Register; login_email is stored in users.username."""
+    """Register; login_email is stored in users.username. Email must be verified before sign-in."""
     login_email = normalize_login_email(login_email)
     if not login_email:
         return False, "Please enter your email address."
@@ -299,13 +352,27 @@ def create_user(login_email: str, password: str) -> tuple[bool, str]:
     if len(password) < 6:
         return False, "Password must be at least 6 characters."
     ph = bcrypt.hash(password)
+    existing_id = get_user_id_by_login_email(login_email)
+    if existing_id is not None:
+        if is_user_email_verified(existing_id):
+            return False, "That email is already registered."
+        if has_unused_valid_verification_token(existing_id):
+            return (
+                False,
+                "A verification link was already sent to this email. Check your inbox and spam—it "
+                "expires in 1 hour. After it expires you can register again.",
+            )
+        delete_user_account(existing_id)
     try:
         with get_conn() as conn:
             conn.execute(
-                "INSERT INTO users (username, password_hash, phone_e164, created_at) VALUES (?, ?, ?, ?)",
-                (login_email, ph, None, _utc_now_iso()),
+                """
+                INSERT INTO users (username, password_hash, phone_e164, created_at, email_verified_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (login_email, ph, None, _utc_now_iso(), None),
             )
-        return True, "Account created. You can sign in with your email and password."
+        return True, ""
     except sqlite3.IntegrityError:
         return False, "That email is already registered."
 
@@ -320,28 +387,41 @@ def get_user_id_by_phone_e164(e164: str) -> int | None:
     return int(row["id"]) if row else None
 
 
-def verify_user(login_email: str, password: str) -> int | None:
-    login_email = normalize_login_email(login_email)
+def try_email_password_sign_in(login: str, password: str) -> tuple[int | None, str | None]:
+    """Returns ``(user_id, None)`` on success; ``(None, 'invalid'|'unverified')`` on failure."""
+    s = (login or "").strip()
+    if not s or "@" not in s:
+        return None, "invalid"
+    if not is_valid_login_email(s):
+        return None, "invalid"
+    login_email = normalize_login_email(s)
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT id, password_hash FROM users WHERE username = ? COLLATE NOCASE",
+            """
+            SELECT id, password_hash, email_verified_at FROM users
+            WHERE username = ? COLLATE NOCASE
+            """,
             (login_email,),
         ).fetchone()
     if row is None:
-        return None
+        return None, "invalid"
     if not bcrypt.verify(_bcrypt_secret(password), row["password_hash"]):
-        return None
-    return int(row["id"])
+        return None, "invalid"
+    ev = row["email_verified_at"]
+    if ev is None or str(ev).strip() == "":
+        return None, "unverified"
+    return int(row["id"]), None
+
+
+def verify_user(login_email: str, password: str) -> int | None:
+    uid, _ = try_email_password_sign_in(login_email, password)
+    return uid
 
 
 def verify_user_identifier(login: str, password: str) -> int | None:
     """Sign in with email + password only."""
-    s = (login or "").strip()
-    if not s or "@" not in s:
-        return None
-    if not is_valid_login_email(s):
-        return None
-    return verify_user(s, password)
+    uid, _ = try_email_password_sign_in(login, password)
+    return uid
 
 
 def update_user_login_email(user_id: int, new_email: str) -> tuple[bool, str]:
@@ -458,12 +538,13 @@ def sign_in_or_register_google(
                     )
                     uid = int(row["id"])
                 else:
+                    now = _utc_now_iso()
                     cur = conn.execute(
                         """
-                        INSERT INTO users (username, password_hash, google_sub, created_at)
-                        VALUES (?, ?, ?, ?)
+                        INSERT INTO users (username, password_hash, phone_e164, google_sub, created_at, email_verified_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
                         """,
-                        (email, unusable_pw_hash, gsub, _utc_now_iso()),
+                        (email, unusable_pw_hash, None, gsub, now, now),
                     )
                     uid = int(cur.lastrowid)
     except sqlite3.IntegrityError:
@@ -532,7 +613,7 @@ def get_delivery_email(user_id: int) -> str | None:
 
 
 def resolve_user_for_password_reset(identifier: str) -> tuple[int | None, str | None]:
-    """Match sign-in email or profile email; reset only if we have an email destination."""
+    """Match sign-in email or profile email; reset only if verified and we have an email destination."""
     raw = identifier.strip()
     if not raw:
         return None, None
@@ -540,6 +621,8 @@ def resolve_user_for_password_reset(identifier: str) -> tuple[int | None, str | 
     if uid is None:
         uid = get_user_id_by_profile_email(raw)
     if uid is None:
+        return None, None
+    if not is_user_email_verified(uid):
         return None, None
     dest = get_delivery_email(uid)
     return (uid, dest) if dest else (None, None)
@@ -592,6 +675,54 @@ def mark_reset_token_used(token_plain: str) -> None:
             "UPDATE password_reset_tokens SET used_at = ? WHERE token_hash = ?",
             (_utc_now_iso(), h),
         )
+
+
+def create_email_verification_token(user_id: int) -> str:
+    """One-hour token; invalidates prior unused tokens for this user."""
+    token_plain = secrets.token_urlsafe(32)
+    exp = datetime.now(timezone.utc) + timedelta(hours=1)
+    exp_s = exp.replace(microsecond=0).isoformat()
+    with get_conn() as conn:
+        conn.execute(
+            "DELETE FROM email_verification_tokens WHERE user_id = ? AND used_at IS NULL",
+            (user_id,),
+        )
+        conn.execute(
+            """
+            INSERT INTO email_verification_tokens (user_id, token_hash, expires_at, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (user_id, _hash_reset_token(token_plain), exp_s, _utc_now_iso()),
+        )
+    return token_plain
+
+
+def try_consume_email_verification_token(token_plain: str) -> int | None:
+    """If valid and unused, mark user verified and token used; return user_id."""
+    if not token_plain or len(token_plain.strip()) < 20:
+        return None
+    h = _hash_reset_token(token_plain)
+    now = _utc_now_iso()
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT user_id FROM email_verification_tokens
+            WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?
+            """,
+            (h, now),
+        ).fetchone()
+        if not row:
+            return None
+        uid = int(row["user_id"])
+        conn.execute(
+            "UPDATE users SET email_verified_at = ? WHERE id = ?",
+            (now, uid),
+        )
+        conn.execute(
+            "UPDATE email_verification_tokens SET used_at = ? WHERE token_hash = ?",
+            (now, h),
+        )
+    return uid
 
 
 def update_user_password(user_id: int, new_password: str) -> tuple[bool, str]:
