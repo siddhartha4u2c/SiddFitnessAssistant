@@ -8,4 +8,3 @@ passlib[bcrypt]
 bcrypt>=4.0.1,<4.1.0
 google-auth-oauthlib>=1.2.0
 phonenumbers>=8.13.0
-twilio>=9.0.0

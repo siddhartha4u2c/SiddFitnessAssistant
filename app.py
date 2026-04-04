@@ -13,7 +13,6 @@ from dotenv import load_dotenv
 import db
 import gemini_env
 import mailer
-import phone_auth
 import text_llm
 import workout_plan
 
@@ -112,6 +111,25 @@ def _guest_auth_body_class_remove() -> None:
 """,
         height=0,
         width=0,
+    )
+
+
+def _google_oauth_mark_html() -> str:
+    """Multicolor G + wordmark (Streamlit buttons cannot embed icons)."""
+    _svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 48 48" '
+        'aria-hidden="true" focusable="false">'
+        '<path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>'
+        '<path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6C44.21 35.03 46.98 30.28 46.98 24.55z"/>'
+        '<path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>'
+        '<path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.73-6c-2.15 1.45-4.92 2.3-6.83 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>'
+        "</svg>"
+    )
+    return (
+        f'<div class="sid-google-oauth-mark" role="group" aria-label="Google sign-in">'
+        f'<span class="sid-google-oauth-icon">{_svg}</span>'
+        '<span class="sid-google-oauth-wordmark">Google</span>'
+        "</div>"
     )
 
 
@@ -340,15 +358,44 @@ def _guest_auth_theme_css() -> str:
         filter: brightness(1.06);
         box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4) !important;
     }
-    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stButton"] button[kind="secondary"] {
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stButton"] button[kind="secondary"],
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stButton"] button[data-testid="baseButton-secondary"] {
         background: #ffffff !important;
         border: 1px solid rgba(59, 130, 246, 0.45) !important;
         color: #0f172a !important;
         font-weight: 600 !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stButton"] button[kind="secondary"] p,
-    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stButton"] button[kind="secondary"] span {
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stButton"] button[kind="secondary"] span,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stButton"] button[data-testid="baseButton-secondary"] p,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stButton"] button[data-testid="baseButton-secondary"] span {
         color: #0f172a !important;
+    }
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) p.sid-oauth-divider {
+        text-align: center !important;
+        font-size: 0.72rem !important;
+        letter-spacing: 0.12em !important;
+        font-weight: 600 !important;
+        text-transform: uppercase;
+        color: #64748b !important;
+        margin: 1rem 0 0.55rem 0 !important;
+    }
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .sid-google-oauth-mark {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        margin: 0 0 0.45rem 0;
+    }
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .sid-google-oauth-icon {
+        display: flex;
+        line-height: 0;
+    }
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .sid-google-oauth-wordmark {
+        font-size: 1.05rem !important;
+        font-weight: 600 !important;
+        color: #334155 !important;
+        letter-spacing: -0.02em;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stExpander"] {
         border: 1px solid rgba(59, 130, 246, 0.22) !important;
@@ -401,30 +448,7 @@ def _guest_auth_theme_css() -> str:
     /* Text inputs, radio groups: BaseWeb / Streamlit label lines */
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stTextInput"] label,
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stTextInput"] [data-testid="stWidgetLabel"] *,
-    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stRadio"] [data-testid="stWidgetLabel"] *,
-    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stRadio"] label,
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-baseweb="form-control-label"] {
-        color: #0f172a !important;
-    }
-    /* Horizontal radio option labels (Password vs one-time code) */
-    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stRadio"] [role="radiogroup"] label,
-    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stRadio"] [role="radiogroup"] p,
-    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stRadio"] [data-baseweb="radio"] label {
-        color: #0f172a !important;
-    }
-    /* Send code: light button, black label (marker sits in previous element-container) */
-    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="element-container"]:has(.sid-mark-before-otp-send)
-        + div[data-testid="element-container"] div[data-testid="stButton"] button[kind="secondary"],
-    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="element-container"]:has(.sid-mark-before-otp-send)
-        + div[data-testid="element-container"] div[data-testid="stButton"] button[data-testid="baseButton-secondary"] {
-        background: #f8fafc !important;
-        color: #0f172a !important;
-        border: 1px solid #e2e8f0 !important;
-    }
-    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="element-container"]:has(.sid-mark-before-otp-send)
-        + div[data-testid="element-container"] div[data-testid="stButton"] button[kind="secondary"] p,
-    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="element-container"]:has(.sid-mark-before-otp-send)
-        + div[data-testid="element-container"] div[data-testid="stButton"] button[kind="secondary"] span {
         color: #0f172a !important;
     }
 </style>
@@ -442,12 +466,12 @@ def _auth_hero_html() -> str:
   <h1>Training &amp; nutrition, <span class="sid-auth-gradient-text">reimagined</span></h1>
   <p class="sid-auth-lead">
     Your intelligent fitness companion for calorie insights, meal logging, weekly plans,
-    and coach-style guidance—personalized from your profile.
+    and coach-style guidance—personalized suited to your needs.
   </p>
   <div class="sid-auth-features">
     <div class="sid-auth-feat">
       <span class="sid-auth-feat-icon">&#128200;</span>
-      <div><strong>Smart calorie targets</strong><br><small>TDEE-aware planning from your stats</small></div>
+      <div><strong>Smart calorie targets</strong><br><small>Planning based on your activity level</small></div>
     </div>
     <div class="sid-auth-feat">
       <span class="sid-auth-feat-icon">&#129367;</span>
@@ -455,7 +479,7 @@ def _auth_hero_html() -> str:
     </div>
     <div class="sid-auth-feat">
       <span class="sid-auth-feat-icon">&#128172;</span>
-      <div><strong>AI coach</strong><br><small>Chat grounded in your logs and goals</small></div>
+      <div><strong>AI coach</strong><br><small>Assistance linked to your goals</small></div>
     </div>
   </div>
 </div>
@@ -1688,7 +1712,7 @@ def render_main_content() -> None:
                             _acct_ok = False
                     if _acct_ok:
                         _u = db.get_username(uid) or ""
-                        if not phone_auth.is_placeholder_login_username(_u):
+                        if not db.is_phone_placeholder_account(uid):
                             sync_email = db.normalize_login_email(_u)
                         else:
                             sync_email = db.normalize_login_email(
@@ -2274,8 +2298,7 @@ else:
         st.markdown(_auth_hero_html(), unsafe_allow_html=True)
     with form_col:
         st.markdown(
-            '<div class="sid-auth-form-heading"><h2>Welcome back</h2>'
-            "<p>Sign in or register to open your dashboard, logs, and AI coach.</p></div>",
+            '<div class="sid-auth-form-heading"><h2>Welcome</h2></div>',
             unsafe_allow_html=True,
         )
         tab_in, tab_reg = st.tabs(["Sign in", "Register"])
@@ -2286,142 +2309,38 @@ else:
             if _g_err:
                 st.error(_g_err)
 
-            sign_mode = st.radio(
-                "Sign in with",
-                ["Password", "One-time code (email or SMS)"],
-                horizontal=True,
-                key="signin_method",
-            )
-
             lu = st.text_input(
-                "Email or mobile number",
+                "Email",
                 key="login_user",
                 autocomplete="username",
-                placeholder="you@example.com or +91 98765 43210",
+                placeholder="you@example.com",
             )
-
-            if sign_mode.startswith("Password"):
-                lp = st.text_input(
-                    "Password",
-                    type="password",
-                    key="login_pass",
-                    autocomplete="current-password",
-                )
-                st.markdown(
-                    '<p style="text-align:right;font-size:0.8rem;margin:-0.5rem 0 0.5rem 0;">'
-                    '<span style="color:#475569;">Forgot password?</span> '
-                    '<span style="color:#1d4ed8;font-weight:600;">Use the section below</span></p>',
-                    unsafe_allow_html=True,
-                )
-                if st.button(
-                    "Sign in", use_container_width=True, key="btn_signin", type="primary"
-                ):
-                    found = db.verify_user_identifier(lu, lp)
+            lp = st.text_input(
+                "Password",
+                type="password",
+                key="login_pass",
+                autocomplete="current-password",
+            )
+            st.markdown(
+                '<p style="text-align:right;font-size:0.8rem;margin:-0.5rem 0 0.5rem 0;">'
+                '<span style="color:#475569;">Forgot password?</span> '
+                '<span style="color:#1d4ed8;font-weight:600;">Use the section below</span></p>',
+                unsafe_allow_html=True,
+            )
+            if st.button(
+                "Sign in", use_container_width=True, key="btn_signin", type="primary"
+            ):
+                raw_e = (lu or "").strip()
+                if not db.is_valid_login_email(raw_e):
+                    st.error("Enter a valid sign-in email address.")
+                else:
+                    found = db.verify_user_identifier(raw_e, lp)
                     if found:
                         st.session_state.user_id = found
                         st.session_state.username = db.get_username(found)
                         st.rerun()
                     else:
-                        st.error("Invalid email/mobile or password.")
-            else:
-                _email_ok = mailer.smtp_configured()
-                _sms_ok = phone_auth.sms_otp_configured()
-                if not _email_ok and not _sms_ok:
-                    st.warning(
-                        "Email codes need **SMTP** in `.env`; SMS codes need **Twilio**. Configure at least one."
-                    )
-                st.markdown(
-                    '<span class="sid-mark-before-otp-send" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                if st.button("Send code", use_container_width=True, key="btn_otp_send", type="secondary"):
-                    st.session_state.pop("otp_pending", None)
-                    raw_id = (lu or "").strip()
-                    if not raw_id:
-                        st.warning("Enter your email or mobile number first.")
-                    elif "@" in raw_id:
-                        if not _email_ok:
-                            st.error(
-                                "SMTP is not configured. Add SMTP_SERVER, SMTP_PORT, SMTP_USERNAME, "
-                                "SMTP_PASSWORD, and MAIL_DEFAULT_SENDER to `.env` for email codes."
-                            )
-                        else:
-                            plain, err_em = db.create_email_otp_challenge(raw_id)
-                            if err_em or not plain:
-                                st.warning(err_em or "Could not send code.")
-                            else:
-                                try:
-                                    mailer.send_login_otp_email(
-                                        db.normalize_login_email(raw_id), plain
-                                    )
-                                    st.session_state["otp_pending"] = {
-                                        "kind": "email",
-                                        "email": db.normalize_login_email(raw_id),
-                                    }
-                                    st.success("Check your **email** for the code (valid ~10 minutes).")
-                                except Exception as exc:
-                                    st.error(f"Could not send email: {exc}")
-                    else:
-                        if not _sms_ok:
-                            st.error(
-                                "SMS is not configured. Add Twilio keys to `.env`, or sign in with email + code."
-                            )
-                        else:
-                            e164 = phone_auth.normalize_phone_e164(raw_id)
-                            if not e164:
-                                st.warning("Enter a valid mobile number (include country code).")
-                            elif db.get_user_id_by_phone_e164(e164) is None:
-                                st.warning("No account uses this number.")
-                            else:
-                                try:
-                                    plain = db.create_phone_otp_challenge(e164)
-                                    phone_auth.send_otp_sms(e164, plain)
-                                    st.session_state["otp_pending"] = {
-                                        "kind": "phone",
-                                        "e164": e164,
-                                    }
-                                    st.success("Code sent by **SMS**.")
-                                except Exception as exc:
-                                    st.error(f"Could not send SMS: {exc}")
-
-                otp_code = st.text_input(
-                    "6-digit code",
-                    key="otp_login_code",
-                    max_chars=8,
-                )
-                if st.button(
-                    "Verify and sign in",
-                    use_container_width=True,
-                    key="btn_otp_verify",
-                    type="primary",
-                ):
-                    pend = st.session_state.get("otp_pending")
-                    if not pend:
-                        st.warning("Send a code first.")
-                    elif pend.get("kind") == "email":
-                        uid_o = db.verify_email_otp_and_get_user_id(
-                            pend["email"], otp_code
-                        )
-                        if not uid_o:
-                            st.error("Invalid or expired code.")
-                        else:
-                            st.session_state.user_id = uid_o
-                            st.session_state.username = db.get_username(uid_o)
-                            st.session_state.pop("otp_pending", None)
-                            st.rerun()
-                    elif pend.get("kind") == "phone":
-                        uid_o = db.verify_phone_otp_and_get_user_id(
-                            pend["e164"], otp_code
-                        )
-                        if not uid_o:
-                            st.error("Invalid or expired code.")
-                        else:
-                            st.session_state.user_id = uid_o
-                            st.session_state.username = db.get_username(uid_o)
-                            st.session_state.pop("otp_pending", None)
-                            st.rerun()
-                    else:
-                        st.warning("Send a code first.")
+                        st.error("Invalid email or password.")
 
             st.markdown(
                 '<p style="font-size:0.78rem;margin:0.25rem 0 0.35rem 0;line-height:1.25;'
@@ -2430,8 +2349,8 @@ else:
             )
             with st.expander("Email a reset link", expanded=False):
                 st.caption(
-                    "Enter the **email you use to sign in**, or your **mobile number** if we can find a "
-                    "reset inbox (you need a real email on file). The link goes to your sign-in email."
+                    "Enter the **email you use to sign in**, or the **email saved on your profile**. "
+                    "Password reset works by email only—the link is sent to that address."
                 )
                 base_url = (os.getenv("PASSWORD_RESET_APP_URL") or "http://localhost:8501").rstrip(
                     "/"
@@ -2439,7 +2358,7 @@ else:
                 if st.button("Send reset link", use_container_width=False, key="btn_forgot_send"):
                     fid = (lu or "").strip()
                     if not fid:
-                        st.warning("Enter your email or mobile in the field above first.")
+                        st.warning("Enter your email in the field above first.")
                     elif not mailer.smtp_configured():
                         st.error(
                             "SMTP is not configured. Add SMTP_SERVER, SMTP_PORT, SMTP_USERNAME, "
@@ -2467,22 +2386,27 @@ else:
                             )
                         else:
                             st.info(
-                                "If an account matches, a reset goes to your **sign-in email**. "
-                                "Mobile-only accounts need an email saved in **My profile** first. "
+                                "If an account matches, a reset goes to your **sign-in** or **profile** email. "
                                 "Nothing else is shown for privacy."
                             )
-            if g.is_configured():
-                st.markdown(
-                    '<p style="text-align:center;font-size:0.72rem;color:#64748b;margin:1rem 0 0.5rem 0;'
-                    'letter-spacing:0.14em;font-weight:600;">OR CONTINUE WITH</p>',
-                    unsafe_allow_html=True,
-                )
-                if st.button(
-                    "Sign in with Google",
-                    use_container_width=True,
-                    key="btn_google_oauth",
-                    type="secondary",
-                ):
+            st.markdown(
+                '<p class="sid-oauth-divider">Or continue with</p>'
+                + _google_oauth_mark_html(),
+                unsafe_allow_html=True,
+            )
+            if st.button(
+                "Sign in with Google",
+                use_container_width=True,
+                key="btn_google_oauth",
+                type="secondary",
+            ):
+                if not g.is_configured():
+                    st.info(
+                        "Google sign-in is off until OAuth is set in `.env`: **GOOGLE_CLIENT_ID**, "
+                        "**GOOGLE_CLIENT_SECRET**, plus a callback URL (**GOOGLE_OAUTH_REDIRECT_URI**, "
+                        "or **PASSWORD_RESET_APP_URL** / **APP_BASE_URL**—see `.env.example`)."
+                    )
+                else:
                     _st_oauth = secrets.token_urlsafe(32)
                     st.session_state["oauth_state"] = _st_oauth
                     st.session_state["google_oauth_redirect_url"] = g.authorization_url(
@@ -2492,22 +2416,16 @@ else:
         with tab_reg:
             import google_oauth as g
 
-            if g.is_configured():
-                st.caption("You can also **Sign in with Google** on the **Sign in** tab.")
             st.caption(
-                "Create one account: fill **email**, **mobile**, or **both** (and the same password). "
-                "At least one of email or mobile is required."
+                "**Sign in with Google** is on the **Sign in** tab (needs OAuth env vars). "
+                "Create an account below with **email** and a password, or add an optional mobile "
+                "later under **My profile**."
             )
             reg_em = st.text_input(
-                "Email (optional)",
+                "Email",
                 key="reg_unified_email",
                 autocomplete="email",
                 placeholder="you@example.com",
-            )
-            reg_ph = st.text_input(
-                "Mobile (optional)",
-                key="reg_unified_phone",
-                placeholder="+91 98765 43210",
             )
             rp = st.text_input("Password", type="password", key="reg_unified_pass")
             rp2 = st.text_input(
@@ -2520,53 +2438,19 @@ else:
                     st.error("Passwords do not match.")
                 else:
                     em = (reg_em or "").strip()
-                    ph_raw = (reg_ph or "").strip()
-                    if not em and not ph_raw:
-                        st.error("Enter an email and/or a mobile number.")
-                    elif em and ph_raw:
-                        if not db.is_valid_login_email(em):
-                            st.error("Please enter a valid email address.")
-                        else:
-                            e164_try = phone_auth.normalize_phone_e164(ph_raw)
-                            if not e164_try:
-                                st.error(
-                                    "Please enter a valid mobile number (with country code if needed)."
-                                )
-                            else:
-                                ok, msg = db.create_user(em, rp, phone_raw=ph_raw)
-                                if ok:
-                                    uid_new = db.get_user_id_by_login_email(em)
-                                    if uid_new:
-                                        db.upsert_profile(
-                                            uid_new,
-                                            {"email": db.normalize_login_email(em)},
-                                        )
-                                    st.success(msg)
-                                else:
-                                    st.error(msg)
-                    elif em:
-                        if not db.is_valid_login_email(em):
-                            st.error("Please enter a valid email address.")
-                        else:
-                            ok, msg = db.create_user(em, rp)
-                            if ok:
-                                uid_new = db.get_user_id_by_login_email(em)
-                                if uid_new:
-                                    db.upsert_profile(
-                                        uid_new,
-                                        {"email": db.normalize_login_email(em)},
-                                    )
-                                st.success(msg)
-                            else:
-                                st.error(msg)
+                    if not em:
+                        st.error("Enter your email address.")
+                    elif not db.is_valid_login_email(em):
+                        st.error("Please enter a valid email address.")
                     else:
-                        ok_p, msg_p = db.create_user_phone(ph_raw, rp)
-                        if ok_p:
-                            _uidp = db.get_user_id_by_phone_e164(
-                                phone_auth.normalize_phone_e164(ph_raw) or ""
-                            )
-                            if _uidp:
-                                db.upsert_profile(_uidp, {})
-                            st.success(msg_p)
+                        ok, msg = db.create_user(em, rp)
+                        if ok:
+                            uid_new = db.get_user_id_by_login_email(em)
+                            if uid_new:
+                                db.upsert_profile(
+                                    uid_new,
+                                    {"email": db.normalize_login_email(em)},
+                                )
+                            st.success(msg)
                         else:
-                            st.error(msg_p)
+                            st.error(msg)
