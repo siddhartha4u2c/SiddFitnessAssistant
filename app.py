@@ -1,8 +1,6 @@
 import html
 import io
-import json
 import os
-import secrets
 from pathlib import Path
 
 import streamlit as st
@@ -111,25 +109,6 @@ def _guest_auth_body_class_remove() -> None:
 """,
         height=0,
         width=0,
-    )
-
-
-def _google_oauth_mark_html() -> str:
-    """Multicolor G + wordmark (Streamlit buttons cannot embed icons)."""
-    _svg = (
-        '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 48 48" '
-        'aria-hidden="true" focusable="false">'
-        '<path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>'
-        '<path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6C44.21 35.03 46.98 30.28 46.98 24.55z"/>'
-        '<path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>'
-        '<path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.73-6c-2.15 1.45-4.92 2.3-6.83 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>'
-        "</svg>"
-    )
-    return (
-        f'<div class="sid-google-oauth-mark" role="group" aria-label="Google sign-in">'
-        f'<span class="sid-google-oauth-icon">{_svg}</span>'
-        '<span class="sid-google-oauth-wordmark">Google</span>'
-        "</div>"
     )
 
 
@@ -370,32 +349,6 @@ def _guest_auth_theme_css() -> str:
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stButton"] button[data-testid="baseButton-secondary"] p,
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stButton"] button[data-testid="baseButton-secondary"] span {
         color: #0f172a !important;
-    }
-    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) p.sid-oauth-divider {
-        text-align: center !important;
-        font-size: 0.72rem !important;
-        letter-spacing: 0.12em !important;
-        font-weight: 600 !important;
-        text-transform: uppercase;
-        color: #64748b !important;
-        margin: 1rem 0 0.55rem 0 !important;
-    }
-    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .sid-google-oauth-mark {
-        display: flex !important;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-        margin: 0 0 0.45rem 0;
-    }
-    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .sid-google-oauth-icon {
-        display: flex;
-        line-height: 0;
-    }
-    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .sid-google-oauth-wordmark {
-        font-size: 1.05rem !important;
-        font-weight: 600 !important;
-        color: #334155 !important;
-        letter-spacing: -0.02em;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stExpander"] {
         border: 1px solid rgba(59, 130, 246, 0.22) !important;
@@ -1227,101 +1180,6 @@ def profile_has_required_fields(p: dict) -> bool:
     return act in labels
 
 
-def _query_param_first(key: str) -> str | None:
-    raw = st.query_params.get(key)
-    if raw is None:
-        return None
-    if isinstance(raw, (list, tuple)):
-        return str(raw[0]).strip() if raw else None
-    s = str(raw).strip()
-    return s if s else None
-
-
-def _clear_google_oauth_query_params() -> None:
-    for key in (
-        "code",
-        "state",
-        "scope",
-        "authuser",
-        "prompt",
-        "hd",
-        "error",
-        "error_description",
-    ):
-        if key in st.query_params:
-            try:
-                del st.query_params[key]
-            except (KeyError, TypeError):
-                pass
-
-
-def _process_google_oauth_callback() -> None:
-    import google_oauth as g
-
-    if not g.is_configured():
-        return
-    code = _query_param_first("code")
-    state = _query_param_first("state")
-    err = _query_param_first("error")
-
-    if st.session_state.user_id is not None:
-        if code or err:
-            _clear_google_oauth_query_params()
-        return
-
-    if err:
-        st.session_state["google_oauth_flash_error"] = (
-            _query_param_first("error_description") or err
-        )
-        _clear_google_oauth_query_params()
-        st.session_state.pop("oauth_state", None)
-        return
-
-    if not code or not state:
-        return
-
-    expected = st.session_state.get("oauth_state")
-    if not expected or state != expected:
-        st.session_state["google_oauth_flash_error"] = (
-            "Sign-in session expired. Please try **Sign in with Google** again."
-        )
-        _clear_google_oauth_query_params()
-        st.session_state.pop("oauth_state", None)
-        return
-
-    try:
-        info = g.exchange_code_for_userinfo(code)
-    except Exception as exc:
-        st.session_state["google_oauth_flash_error"] = f"Google sign-in failed: {exc}"
-        _clear_google_oauth_query_params()
-        st.session_state.pop("oauth_state", None)
-        return
-
-    st.session_state.pop("oauth_state", None)
-    _clear_google_oauth_query_params()
-
-    if info.get("email_verified") is not True:
-        st.session_state["google_oauth_flash_error"] = (
-            "Google did not confirm a verified email. Use another sign-in method."
-        )
-        return
-
-    email = (info.get("email") or "").strip()
-    sub = (info.get("sub") or "").strip()
-    name = (info.get("name") or "").strip()
-    uid_g, msg = db.sign_in_or_register_google(
-        email=email, google_sub=sub, full_name=name or None
-    )
-    if msg:
-        st.session_state["google_oauth_flash_error"] = msg
-        return
-    if uid_g:
-        st.session_state.user_id = uid_g
-        st.session_state.username = db.get_username(uid_g)
-        st.rerun()
-
-
-_process_google_oauth_callback()
 uid = st.session_state.user_id
 active = uid is not None
 
@@ -1525,7 +1383,7 @@ def render_main_content() -> None:
                         "Email (sign-in)",
                         value=login_mail,
                         disabled=True,
-                        help="Your sign-in email (registration or Google).",
+                        help="Your sign-in email (from registration).",
                         key="profile_readonly_email",
                     )
                 profile_phone = st.text_input(
@@ -2288,30 +2146,6 @@ if active:
             st.rerun()
     render_main_content()
 else:
-    _go_redir = st.session_state.pop("google_oauth_redirect_url", None)
-    if _go_redir:
-        # Auto-redirect via components.html is unreliable (nested iframes / CSP). A normal link with
-        # target="_top" navigates the real window when the user taps once.
-        _guest_auth_body_class_add()
-        st.markdown(_guest_auth_theme_css(), unsafe_allow_html=True)
-        st.markdown(
-            '<p style="margin:0 0 0.65rem 0;color:#0f172a;font-size:0.95rem;line-height:1.45;">'
-            "<strong>Next step:</strong> open Google to sign in. After you authorize, you’ll come back "
-            "to this app.</p>",
-            unsafe_allow_html=True,
-        )
-        _href = html.escape(_go_redir, quote=True)
-        st.markdown(
-            f'<div style="text-align:center;margin:0 0 0.5rem 0;">'
-            f'<a href="{_href}" target="_top" rel="noopener noreferrer" '
-            'style="display:inline-block;padding:0.65rem 1.35rem;min-width:240px;text-align:center;'
-            "background:linear-gradient(90deg,#2563eb 0%,#0891b2 100%);color:#ffffff !important;"
-            "border-radius:12px;font-weight:600;text-decoration:none;"
-            'box-shadow:0 4px 14px rgba(37,99,235,0.35);">Open Google sign-in</a></div>',
-            unsafe_allow_html=True,
-        )
-        st.stop()
-
     _guest_auth_body_class_add()
     st.markdown(_guest_auth_theme_css(), unsafe_allow_html=True)
 
@@ -2325,12 +2159,6 @@ else:
         )
         tab_in, tab_reg = st.tabs(["Sign in", "Register"])
         with tab_in:
-            import google_oauth as g
-
-            _g_err = st.session_state.pop("google_oauth_flash_error", None)
-            if _g_err:
-                st.error(_g_err)
-
             lu = st.text_input(
                 "Email",
                 key="login_user",
@@ -2364,11 +2192,6 @@ else:
                     else:
                         st.error("Invalid email or password.")
 
-            st.markdown(
-                '<p style="font-size:0.78rem;margin:0.25rem 0 0.35rem 0;line-height:1.25;'
-                'color:#475569;">Email reset link</p>',
-                unsafe_allow_html=True,
-            )
             with st.expander("Email a reset link", expanded=False):
                 st.caption(
                     "Enter the **email you use to sign in**, or the **email saved on your profile**. "
@@ -2411,37 +2234,10 @@ else:
                                 "If an account matches, a reset goes to your **sign-in** or **profile** email. "
                                 "Nothing else is shown for privacy."
                             )
-            st.markdown(
-                '<p class="sid-oauth-divider">Or continue with</p>'
-                + _google_oauth_mark_html(),
-                unsafe_allow_html=True,
-            )
-            if st.button(
-                "Sign in with Google",
-                use_container_width=True,
-                key="btn_google_oauth",
-                type="secondary",
-            ):
-                if not g.is_configured():
-                    st.info(
-                        "Google sign-in is off until OAuth is set in `.env`: **GOOGLE_CLIENT_ID**, "
-                        "**GOOGLE_CLIENT_SECRET**, plus a callback URL (**GOOGLE_OAUTH_REDIRECT_URI**, "
-                        "or **PASSWORD_RESET_APP_URL** / **APP_BASE_URL**—see `.env.example`)."
-                    )
-                else:
-                    _st_oauth = secrets.token_urlsafe(32)
-                    st.session_state["oauth_state"] = _st_oauth
-                    st.session_state["google_oauth_redirect_url"] = g.authorization_url(
-                        _st_oauth
-                    )
-                    st.rerun()
         with tab_reg:
-            import google_oauth as g
-
             st.caption(
-                "**Sign in with Google** is on the **Sign in** tab (needs OAuth env vars). "
-                "Create an account below with **email** and a password, or add an optional mobile "
-                "later under **My profile**."
+                "Create an account with your **email** and a password. You can add an optional mobile "
+                "number later under **My profile**."
             )
             reg_em = st.text_input(
                 "Email",
