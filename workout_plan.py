@@ -443,6 +443,7 @@ def generate_day_image(
     base_url: str | None = None,
     fallback_api_key: str | None = None,
     fallback_base_url: str | None = None,
+    physique_descriptor: str = "",
 ) -> tuple[bytes | None, str | None]:
     """Images: EURI uses OpenAI-style ``images/generations`` (no reference face).
 
@@ -488,6 +489,7 @@ def generate_day_image(
             day_num,
             exercise_text,
             gender,
+            physique_descriptor=physique_descriptor,
         )
         if img:
             return img, None
