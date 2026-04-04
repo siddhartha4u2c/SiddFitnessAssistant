@@ -1329,34 +1329,41 @@ active = uid is not None
 def _signed_in_theme_css() -> str:
     return """
 <style>
+    /* Match guest login: light blue page gradient */
     .stApp {
-        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%) !important;
+        background: linear-gradient(160deg, #bfdbfe 0%, #dbeafe 35%, #e0f2fe 70%, #f0f9ff 100%) !important;
         color-scheme: light;
+        color: #0f172a !important;
     }
     section.main > div {
         max-width: 100%;
     }
     .main .block-container {
-        background-color: #ffffff !important;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
         border-radius: 20px !important;
-        border: 1px solid rgba(226, 232, 240, 0.95) !important;
-        box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 24px 48px -12px rgba(15, 23, 42, 0.1) !important;
+        border: 1px solid rgba(59, 130, 246, 0.22) !important;
+        box-shadow:
+            0 4px 6px -1px rgba(37, 99, 235, 0.08),
+            0 16px 40px -12px rgba(14, 165, 233, 0.15) !important;
         padding-top: 1.35rem !important;
         padding-bottom: 2.5rem !important;
         margin-top: 0.5rem !important;
     }
     header[data-testid="stHeader"] {
-        background: rgba(248, 250, 252, 0.92) !important;
+        background: rgba(255, 255, 255, 0.55) !important;
         backdrop-filter: blur(8px);
-        border-bottom: 1px solid #e2e8f0 !important;
+        border-bottom: 1px solid rgba(59, 130, 246, 0.2) !important;
+    }
+    [data-testid="stToolbar"] {
+        background: rgba(255, 255, 255, 0.45) !important;
     }
     .main .block-container div[data-testid="stHorizontalBlock"]:first-of-type
         div[data-testid="column"]:last-child {
-        background: linear-gradient(165deg, #ecfdf5 0%, #f0fdfa 40%, #ffffff 100%);
-        border: 1px solid rgba(45, 212, 191, 0.35);
+        background: linear-gradient(165deg, #ffffff 0%, #f0f9ff 45%, #e0f2fe 100%);
+        border: 1px solid rgba(59, 130, 246, 0.28);
         border-radius: 16px;
         padding: 0.55rem 0.9rem 0.65rem;
-        box-shadow: 0 4px 20px rgba(13, 148, 136, 0.12);
+        box-shadow: 0 4px 20px rgba(37, 99, 235, 0.12);
         margin-top: 0.15rem;
     }
     .main .block-container div[data-testid="stHorizontalBlock"]:first-of-type
@@ -2283,10 +2290,25 @@ if active:
 else:
     _go_redir = st.session_state.pop("google_oauth_redirect_url", None)
     if _go_redir:
-        components.html(
-            f"<script>window.location.replace({json.dumps(_go_redir)});</script>",
-            height=0,
-            width=0,
+        # Auto-redirect via components.html is unreliable (nested iframes / CSP). A normal link with
+        # target="_top" navigates the real window when the user taps once.
+        _guest_auth_body_class_add()
+        st.markdown(_guest_auth_theme_css(), unsafe_allow_html=True)
+        st.markdown(
+            '<p style="margin:0 0 0.65rem 0;color:#0f172a;font-size:0.95rem;line-height:1.45;">'
+            "<strong>Next step:</strong> open Google to sign in. After you authorize, you’ll come back "
+            "to this app.</p>",
+            unsafe_allow_html=True,
+        )
+        _href = html.escape(_go_redir, quote=True)
+        st.markdown(
+            f'<div style="text-align:center;margin:0 0 0.5rem 0;">'
+            f'<a href="{_href}" target="_top" rel="noopener noreferrer" '
+            'style="display:inline-block;padding:0.65rem 1.35rem;min-width:240px;text-align:center;'
+            "background:linear-gradient(90deg,#2563eb 0%,#0891b2 100%);color:#ffffff !important;"
+            "border-radius:12px;font-weight:600;text-decoration:none;"
+            'box-shadow:0 4px 14px rgba(37,99,235,0.35);">Open Google sign-in</a></div>',
+            unsafe_allow_html=True,
         )
         st.stop()
 
