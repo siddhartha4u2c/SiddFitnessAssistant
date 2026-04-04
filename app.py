@@ -119,16 +119,16 @@ def _guest_auth_theme_css() -> str:
     return """
 <style>
     .sid-guest-auth .stApp {
-        background: linear-gradient(145deg, #0b1224 0%, #0f172a 40%, #111c33 100%) !important;
-        color-scheme: dark;
-        color: #ffffff !important;
+        background: linear-gradient(160deg, #bfdbfe 0%, #dbeafe 35%, #e0f2fe 70%, #f0f9ff 100%) !important;
+        color-scheme: light;
+        color: #0f172a !important;
     }
     .sid-guest-auth header[data-testid="stHeader"] {
-        background: transparent !important;
-        border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important;
+        background: rgba(255, 255, 255, 0.55) !important;
+        border-bottom: 1px solid rgba(59, 130, 246, 0.2) !important;
     }
     .sid-guest-auth [data-testid="stToolbar"] {
-        background: rgba(15, 23, 42, 0.5) !important;
+        background: rgba(255, 255, 255, 0.45) !important;
     }
     .sid-guest-auth .main .block-container {
         padding: 1.5rem 1.75rem 2.5rem !important;
@@ -144,14 +144,14 @@ def _guest_auth_theme_css() -> str:
         gap: 0.5rem !important;
     }
     .sid-guest-auth .main .block-container > div > div[data-testid="stHorizontalBlock"]:first-of-type > div[data-testid="column"]:first-child {
-        background: linear-gradient(165deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.88) 100%);
-        border: 1px solid rgba(45, 212, 191, 0.15);
+        background: linear-gradient(165deg, #ffffff 0%, #f0f9ff 45%, #e0f2fe 100%);
+        border: 1px solid rgba(59, 130, 246, 0.28);
         border-radius: 20px;
         padding: 0 !important;
         box-shadow:
-            0 0 0 1px rgba(255,255,255,0.04) inset,
-            0 24px 48px rgba(0, 0, 0, 0.35),
-            0 0 80px rgba(45, 212, 191, 0.08);
+            0 0 0 1px rgba(255, 255, 255, 0.8) inset,
+            0 12px 40px rgba(37, 99, 235, 0.12),
+            0 4px 16px rgba(14, 165, 233, 0.08);
         position: relative;
         overflow: hidden;
     }
@@ -160,22 +160,22 @@ def _guest_auth_theme_css() -> str:
         position: absolute;
         inset: 0;
         background-image:
-            linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+            linear-gradient(rgba(59, 130, 246, 0.06) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(59, 130, 246, 0.06) 1px, transparent 1px);
         background-size: 24px 24px;
         pointer-events: none;
-        opacity: 0.5;
+        opacity: 0.7;
     }
     .sid-guest-auth .main .block-container > div > div[data-testid="stHorizontalBlock"]:first-of-type > div[data-testid="column"]:nth-child(2) {
-        background: linear-gradient(165deg, rgba(30, 41, 59, 0.96) 0%, rgba(15, 23, 42, 0.99) 100%) !important;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
         border-radius: 20px !important;
         padding: 1.35rem 1.5rem 1.75rem !important;
         box-shadow:
-            0 4px 6px -1px rgba(0, 0, 0, 0.28),
-            0 24px 48px -12px rgba(0, 0, 0, 0.42) !important;
-        border: 1px solid rgba(148, 163, 184, 0.22) !important;
-        color-scheme: dark !important;
-        color: #ffffff !important;
+            0 4px 6px -1px rgba(37, 99, 235, 0.08),
+            0 16px 40px -12px rgba(14, 165, 233, 0.15) !important;
+        border: 1px solid rgba(59, 130, 246, 0.22) !important;
+        color-scheme: light !important;
+        color: #0f172a !important;
     }
     .sid-auth-hero {
         position: relative;
@@ -206,7 +206,7 @@ def _guest_auth_theme_css() -> str:
     .sid-auth-brand-name {
         font-size: 1.15rem;
         font-weight: 700;
-        color: #f8fafc;
+        color: #0f172a;
         letter-spacing: -0.02em;
     }
     .sid-auth-pulse {
@@ -220,7 +220,7 @@ def _guest_auth_theme_css() -> str:
     .sid-auth-hero h1 {
         font-size: clamp(1.65rem, 2.5vw, 2.15rem);
         font-weight: 700;
-        color: #f8fafc;
+        color: #0c4a6e;
         line-height: 1.2;
         margin: 0 0 0.85rem 0;
         letter-spacing: -0.03em;
@@ -232,7 +232,7 @@ def _guest_auth_theme_css() -> str:
         background-clip: text;
     }
     .sid-auth-lead {
-        color: #ffffff;
+        color: #334155;
         font-size: 0.95rem;
         line-height: 1.55;
         margin: 0 0 1.75rem 0;
@@ -248,8 +248,8 @@ def _guest_auth_theme_css() -> str:
         align-items: flex-start;
         gap: 0.75rem;
         padding: 0.65rem 0.85rem;
-        background: rgba(15, 23, 42, 0.45);
-        border: 1px solid rgba(148, 163, 184, 0.12);
+        background: rgba(255, 255, 255, 0.75);
+        border: 1px solid rgba(59, 130, 246, 0.2);
         border-radius: 12px;
         backdrop-filter: blur(8px);
     }
@@ -258,60 +258,60 @@ def _guest_auth_theme_css() -> str:
         line-height: 1;
     }
     .sid-auth-feat strong {
-        color: #ffffff;
+        color: #0f172a;
         font-size: 0.875rem;
     }
     .sid-auth-feat small {
-        color: #ffffff;
-        opacity: 0.92;
+        color: #475569;
+        opacity: 1;
         font-size: 0.75rem;
     }
     .sid-auth-form-heading h2 {
         margin: 0 0 0.35rem 0;
         font-size: 1.5rem;
         font-weight: 700;
-        color: #ffffff;
+        color: #0c4a6e;
         letter-spacing: -0.03em;
     }
     .sid-auth-form-heading p {
         margin: 0 0 1rem 0;
         font-size: 0.9rem;
-        color: #ffffff;
+        color: #334155;
         line-height: 1.45;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .sid-auth-form-heading h2 {
-        color: #ffffff !important;
+        color: #0c4a6e !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .sid-auth-form-heading p {
-        color: #ffffff !important;
+        color: #334155 !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stWidgetLabel"] p,
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stWidgetLabel"] label {
-        color: #ffffff !important;
+        color: #0f172a !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stCaption"],
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .stCaption {
-        color: #ffffff !important;
-        opacity: 0.95;
+        color: #475569 !important;
+        opacity: 1;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .stMarkdown,
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .stMarkdown p {
-        color: #ffffff !important;
+        color: #0f172a !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .stMarkdown a {
-        color: #ffffff !important;
+        color: #1d4ed8 !important;
         text-decoration: underline;
         text-underline-offset: 2px;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-baseweb="input"] {
         border-radius: 10px !important;
-        border-color: rgba(148, 163, 184, 0.35) !important;
-        background: rgba(15, 23, 42, 0.65) !important;
-        color: #f8fafc !important;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+        border-color: rgba(59, 130, 246, 0.35) !important;
+        background: #ffffff !important;
+        color: #0f172a !important;
+        box-shadow: 0 1px 2px rgba(37, 99, 235, 0.06) !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .stTabs [data-baseweb="tab-list"] {
-        background: rgba(15, 23, 42, 0.55) !important;
+        background: rgba(191, 219, 254, 0.55) !important;
         border-radius: 12px !important;
         padding: 4px !important;
         gap: 4px !important;
@@ -319,12 +319,12 @@ def _guest_auth_theme_css() -> str:
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .stTabs [data-baseweb="tab"] {
         border-radius: 10px !important;
         font-weight: 600 !important;
-        color: #ffffff !important;
+        color: #1e40af !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .stTabs [aria-selected="true"] {
-        background: rgba(51, 65, 85, 0.95) !important;
-        color: #ffffff !important;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25) !important;
+        background: #ffffff !important;
+        color: #0c4a6e !important;
+        box-shadow: 0 1px 4px rgba(37, 99, 235, 0.15) !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stButton"] button[kind="primary"],
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stButton"] button[data-testid="baseButton-primary"] {
@@ -341,46 +341,91 @@ def _guest_auth_theme_css() -> str:
         box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4) !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stButton"] button[kind="secondary"] {
-        background: rgba(30, 41, 59, 0.85) !important;
-        border: 1px solid rgba(255, 255, 255, 0.35) !important;
-        color: #ffffff !important;
+        background: #ffffff !important;
+        border: 1px solid rgba(59, 130, 246, 0.45) !important;
+        color: #0f172a !important;
         font-weight: 600 !important;
     }
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stButton"] button[kind="secondary"] p,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stButton"] button[kind="secondary"] span {
+        color: #0f172a !important;
+    }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stExpander"] {
-        border: 1px solid rgba(148, 163, 184, 0.22) !important;
+        border: 1px solid rgba(59, 130, 246, 0.22) !important;
         border-radius: 12px !important;
-        background: rgba(15, 23, 42, 0.45) !important;
+        background: rgba(240, 249, 255, 0.85) !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stRadio"] label,
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stRadio"] p,
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stRadio"] div,
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stCheckbox"] label,
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stCheckbox"] p {
-        color: #ffffff !important;
+        color: #0f172a !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stExpander"] p,
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stExpander"] span,
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stExpander"] label,
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stExpander"] summary,
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stExpander"] div {
-        color: #ffffff !important;
+        color: #0f172a !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-baseweb="input"]::placeholder {
-        color: rgba(255, 255, 255, 0.5) !important;
+        color: rgba(15, 23, 42, 0.45) !important;
     }
     .sid-guest-auth [data-testid="stAlert"] {
-        background: rgba(30, 41, 59, 0.92) !important;
-        border: 1px solid rgba(255, 255, 255, 0.18) !important;
+        background: rgba(255, 255, 255, 0.92) !important;
+        border: 1px solid rgba(59, 130, 246, 0.25) !important;
     }
     .sid-guest-auth [data-testid="stAlert"] p,
     .sid-guest-auth [data-testid="stAlert"] div,
     .sid-guest-auth [data-testid="stAlert"] span {
-        color: #ffffff !important;
+        color: #0f172a !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stFileUploader"] section small,
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stFileUploader"] section p,
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stFileUploader"] label {
-        color: #ffffff !important;
+        color: #0f172a !important;
+    }
+    /* Tab labels (Sign in / Register) and all inner tab text */
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-baseweb="tab"],
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-baseweb="tab"] p,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-baseweb="tab"] span,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-baseweb="tab"] div {
+        color: #1e40af !important;
+    }
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-baseweb="tab"][aria-selected="true"] p,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-baseweb="tab"][aria-selected="true"] span,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-baseweb="tab"][aria-selected="true"] div {
+        color: #0c4a6e !important;
+    }
+    /* Text inputs, radio groups: BaseWeb / Streamlit label lines */
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stTextInput"] label,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stTextInput"] [data-testid="stWidgetLabel"] *,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stRadio"] [data-testid="stWidgetLabel"] *,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stRadio"] label,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-baseweb="form-control-label"] {
+        color: #0f172a !important;
+    }
+    /* Horizontal radio option labels (Password vs one-time code) */
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stRadio"] [role="radiogroup"] label,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stRadio"] [role="radiogroup"] p,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stRadio"] [data-baseweb="radio"] label {
+        color: #0f172a !important;
+    }
+    /* Send code: light button, black label (marker sits in previous element-container) */
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="element-container"]:has(.sid-mark-before-otp-send)
+        + div[data-testid="element-container"] div[data-testid="stButton"] button[kind="secondary"],
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="element-container"]:has(.sid-mark-before-otp-send)
+        + div[data-testid="element-container"] div[data-testid="stButton"] button[data-testid="baseButton-secondary"] {
+        background: #f8fafc !important;
+        color: #0f172a !important;
+        border: 1px solid #e2e8f0 !important;
+    }
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="element-container"]:has(.sid-mark-before-otp-send)
+        + div[data-testid="element-container"] div[data-testid="stButton"] button[kind="secondary"] p,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="element-container"]:has(.sid-mark-before-otp-send)
+        + div[data-testid="element-container"] div[data-testid="stButton"] button[kind="secondary"] span {
+        color: #0f172a !important;
     }
 </style>
 """
@@ -1350,16 +1395,26 @@ def render_main_content() -> None:
                     label_visibility="collapsed",
                 )
             else:
-                st.caption("Use a file or the camera to set your picture.")
-                up_col, cam_col = st.columns(2, gap="small")
-                with up_col:
-                    up_prof = st.file_uploader(
-                        "profile_file",
-                        type=["jpg", "jpeg", "png"],
-                        key=_prof_up_key,
-                        label_visibility="collapsed",
-                    )
-                with cam_col:
+                st.session_state.setdefault("profile_camera_open", False)
+                st.caption(
+                    "Upload a picture, or tap **Take photo** when you want to use the camera (it does not open by itself)."
+                )
+                up_prof = st.file_uploader(
+                    "profile_file",
+                    type=["jpg", "jpeg", "png"],
+                    key=_prof_up_key,
+                    label_visibility="collapsed",
+                )
+                if st.button("Take photo", key="btn_profile_open_camera"):
+                    st.session_state["profile_camera_open"] = True
+                    st.rerun()
+                if st.session_state.get("profile_camera_open"):
+                    if st.button("Close camera", key="btn_profile_close_camera"):
+                        st.session_state["profile_camera_open"] = False
+                        st.session_state.profile_photo_cam_widget_key = (
+                            int(st.session_state.get("profile_photo_cam_widget_key", 0)) + 1
+                        )
+                        st.rerun()
                     _cam_wkey = st.session_state.setdefault("profile_photo_cam_widget_key", 0)
                     cam_shot = st.camera_input(
                         "profile_cam",
@@ -1369,6 +1424,7 @@ def render_main_content() -> None:
             if _has_prof_photo:
                 if st.button("Take profile photo", key="btn_remove_profile_photo"):
                     db.remove_profile_image(uid)
+                    st.session_state["profile_camera_open"] = False
                     st.session_state.profile_photo_cam_widget_key = (
                         int(st.session_state.get("profile_photo_cam_widget_key", 0)) + 1
                     )
@@ -1393,6 +1449,7 @@ def render_main_content() -> None:
                     im = Image.open(cam_shot).convert("RGB")
                     im.thumbnail((1024, 1024))
                     im.save(pimg_path, "JPEG", quality=88)
+                    st.session_state["profile_camera_open"] = False
                     st.session_state.profile_photo_cam_widget_key = (
                         int(st.session_state.get("profile_photo_cam_widget_key", 0)) + 1
                     )
@@ -2252,8 +2309,8 @@ else:
                 )
                 st.markdown(
                     '<p style="text-align:right;font-size:0.8rem;margin:-0.5rem 0 0.5rem 0;">'
-                    '<span style="color:#ffffff;">Forgot password?</span> '
-                    '<span style="color:#ffffff;font-weight:600;">Use the section below</span></p>',
+                    '<span style="color:#475569;">Forgot password?</span> '
+                    '<span style="color:#1d4ed8;font-weight:600;">Use the section below</span></p>',
                     unsafe_allow_html=True,
                 )
                 if st.button(
@@ -2273,6 +2330,10 @@ else:
                     st.warning(
                         "Email codes need **SMTP** in `.env`; SMS codes need **Twilio**. Configure at least one."
                     )
+                st.markdown(
+                    '<span class="sid-mark-before-otp-send" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
                 if st.button("Send code", use_container_width=True, key="btn_otp_send", type="secondary"):
                     st.session_state.pop("otp_pending", None)
                     raw_id = (lu or "").strip()
@@ -2364,7 +2425,7 @@ else:
 
             st.markdown(
                 '<p style="font-size:0.78rem;margin:0.25rem 0 0.35rem 0;line-height:1.25;'
-                'color:#ffffff;">Email reset link</p>',
+                'color:#475569;">Email reset link</p>',
                 unsafe_allow_html=True,
             )
             with st.expander("Email a reset link", expanded=False):
@@ -2412,7 +2473,7 @@ else:
                             )
             if g.is_configured():
                 st.markdown(
-                    '<p style="text-align:center;font-size:0.72rem;color:#ffffff;margin:1rem 0 0.5rem 0;'
+                    '<p style="text-align:center;font-size:0.72rem;color:#64748b;margin:1rem 0 0.5rem 0;'
                     'letter-spacing:0.14em;font-weight:600;">OR CONTINUE WITH</p>',
                     unsafe_allow_html=True,
                 )
