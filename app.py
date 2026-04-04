@@ -1,5 +1,6 @@
 import html
 import io
+import logging
 import os
 from datetime import date
 from pathlib import Path
@@ -47,6 +48,23 @@ if "username" not in st.session_state:
     st.session_state.username = None
 if "last_meal_context" not in st.session_state:
     st.session_state.last_meal_context = ""
+
+if "mailer_backend_logged" not in st.session_state:
+    st.session_state.mailer_backend_logged = True
+    _mlog = logging.getLogger(__name__)
+    if mailer.resend_configured():
+        _mlog.info("Transactional email: Resend API (HTTPS)")
+    elif mailer.smtp_configured():
+        if os.getenv("RENDER", "").lower() == "true":
+            _mlog.warning(
+                "Transactional email: SMTP is set, but Render Free blocks outbound SMTP (ports "
+                "25/465/587). Add RESEND_API_KEY + RESEND_FROM_EMAIL in Environment, or upgrade "
+                "your Render plan—registration mail will not send via SMTP on Free."
+            )
+        else:
+            _mlog.info("Transactional email: SMTP")
+    else:
+        _mlog.warning("Transactional email: not configured (set Resend or SMTP env vars)")
 
 
 def _compact_ui_css() -> str:
@@ -2813,10 +2831,12 @@ else:
                     fid = (lu or "").strip()
                     if not fid:
                         st.warning("Enter your email in the field above first.")
-                    elif not mailer.smtp_configured():
+                    elif not mailer.transactional_email_configured():
                         st.error(
-                            "SMTP is not configured. Add SMTP_SERVER, SMTP_PORT, SMTP_USERNAME, "
-                            "SMTP_PASSWORD, and MAIL_DEFAULT_SENDER to `.env`."
+                            "Email sending is not configured. Use **Resend** on Render Free "
+                            "(RESEND_API_KEY, RESEND_FROM_EMAIL) or **SMTP** locally "
+                            "(SMTP_SERVER, SMTP_USERNAME, SMTP_PASSWORD, MAIL_DEFAULT_SENDER). "
+                            "See `.env.example`."
                         )
                     else:
                         uid_f, email_f = db.resolve_user_for_password_reset(fid)
@@ -2873,10 +2893,10 @@ else:
                     autocomplete="new-password",
                 )
                 if st.button("Resend activation email", key="btn_resend_activation"):
-                    if not mailer.smtp_configured():
+                    if not mailer.transactional_email_configured():
                         st.error(
-                            "SMTP is not configured on the server. The operator must set "
-                            "SMTP_SERVER, SMTP_USERNAME, SMTP_PASSWORD, and MAIL_DEFAULT_SENDER."
+                            "Email is not configured on the server. Set **RESEND_API_KEY** + "
+                            "**RESEND_FROM_EMAIL** (Render Free) or SMTP variables. See `.env.example`."
                         )
                     else:
                         ok_r, msg_r, uid_r = db.try_resend_activation_email(ra_em, ra_pw)
@@ -2911,11 +2931,11 @@ else:
                         st.error("Enter your email address.")
                     elif not db.is_valid_login_email(em):
                         st.error("Please enter a valid email address.")
-                    elif not mailer.smtp_configured():
+                    elif not mailer.transactional_email_configured():
                         st.error(
-                            "Registration needs email activation. Configure SMTP in `.env` "
-                            "(SMTP_SERVER, SMTP_USERNAME, SMTP_PASSWORD, MAIL_DEFAULT_SENDER) "
-                            "or ask your administrator."
+                            "Registration needs email activation. On **Render Free** use **Resend** "
+                            "(RESEND_API_KEY, RESEND_FROM_EMAIL); locally you can use SMTP. "
+                            "See `.env.example` or ask your administrator."
                         )
                     else:
                         ok, msg = db.create_user(em, rp)

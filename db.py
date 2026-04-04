@@ -380,8 +380,9 @@ def create_user(login_email: str, password: str) -> tuple[bool, str]:
             return (
                 False,
                 "An activation link was already sent to this email address. Check **inbox and spam**, "
-                "and wait a few minutes. If nothing arrives, the host may have **SMTP misconfigured** "
-                "(e.g. on Render: set **SMTP_*** and **MAIL_DEFAULT_SENDER** in Environment)—use "
+                "and wait a few minutes. If nothing arrives, the host may have **email misconfigured** "
+                "(on **Render Free** use **Resend**: `RESEND_API_KEY` + `RESEND_FROM_EMAIL`; SMTP ports "
+                "are blocked there—or use SMTP on a host that allows it)—use "
                 "**Resend activation email** below with your password. "
                 "That link is valid for **1 hour**—you cannot register again with this email until it "
                 "expires. After it expires, the old link stops working and you can register again with "

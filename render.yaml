@@ -1,5 +1,8 @@
 # Blueprint for https://render.com — connect this GitHub repo, then "Apply" or create a Web Service manually.
 # Build/start assume the repo root is this folder (where app.py and requirements.txt live).
+#
+# Render Free blocks outbound SMTP. Set in the dashboard: RESEND_API_KEY, RESEND_FROM_EMAIL,
+# PASSWORD_RESET_APP_URL (your https://….onrender.com URL), plus LLM keys. See .env.example.
 services:
   - type: web
     name: sidd-fitness-assistant

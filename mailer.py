@@ -1,11 +1,18 @@
-"""Send transactional email via SMTP (e.g. Gmail)."""
+"""Send transactional email via SMTP (e.g. Gmail) or Resend HTTPS API.
+
+Render **Free** web services block outbound **SMTP** (ports 25, 465, 587). Local dev can use
+SMTP; on Render Free set **RESEND_API_KEY** + **RESEND_FROM_EMAIL** instead (HTTPS, port 443).
+"""
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import socket
 import smtplib
+import urllib.error
+import urllib.request
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -25,6 +32,56 @@ def smtp_configured() -> bool:
         and _smtp_password()
         and (os.getenv("MAIL_DEFAULT_SENDER") or user).strip()
     )
+
+
+def resend_configured() -> bool:
+    key = (os.getenv("RESEND_API_KEY") or "").strip()
+    from_addr = (os.getenv("RESEND_FROM_EMAIL") or "").strip()
+    return bool(key and from_addr)
+
+
+def transactional_email_configured() -> bool:
+    """True if either Resend (HTTPS) or SMTP can send activation/reset mail."""
+    return resend_configured() or smtp_configured()
+
+
+def _send_via_resend(to_address: str, subject: str, body: str) -> None:
+    key = (os.getenv("RESEND_API_KEY") or "").strip()
+    from_addr = (os.getenv("RESEND_FROM_EMAIL") or "").strip()
+    if not key or not from_addr:
+        raise RuntimeError("RESEND_API_KEY and RESEND_FROM_EMAIL must be set.")
+
+    payload = json.dumps(
+        {
+            "from": from_addr,
+            "to": [to_address],
+            "subject": subject,
+            "text": body,
+        }
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            resp.read()
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode(errors="replace") if e.fp else str(e)
+        raise RuntimeError(f"Resend API HTTP {e.code}: {detail}") from e
+    _logger.info("Resend send OK to=%s subject=%r", to_address, subject)
+
+
+def _send_transactional(to_address: str, subject: str, body: str) -> None:
+    if resend_configured():
+        _send_via_resend(to_address, subject, body)
+    else:
+        _send_smtp_plain(to_address, subject, body)
 
 
 def _send_smtp_plain(to_address: str, subject: str, body: str) -> None:
@@ -122,4 +179,4 @@ If you did not create an account, you can ignore this email.
 —
 This message was sent from an automated address. Do not reply.
 """
-    _send_smtp_plain(to_address, subject, body)
+    _send_transactional(to_address, subject, body)
