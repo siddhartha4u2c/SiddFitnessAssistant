@@ -121,6 +121,7 @@ def _guest_auth_theme_css() -> str:
     .sid-guest-auth .stApp {
         background: linear-gradient(145deg, #0b1224 0%, #0f172a 40%, #111c33 100%) !important;
         color-scheme: dark;
+        color: #ffffff !important;
     }
     .sid-guest-auth header[data-testid="stHeader"] {
         background: transparent !important;
@@ -174,7 +175,7 @@ def _guest_auth_theme_css() -> str:
             0 24px 48px -12px rgba(0, 0, 0, 0.42) !important;
         border: 1px solid rgba(148, 163, 184, 0.22) !important;
         color-scheme: dark !important;
-        color: #f1f5f9 !important;
+        color: #ffffff !important;
     }
     .sid-auth-hero {
         position: relative;
@@ -231,7 +232,7 @@ def _guest_auth_theme_css() -> str:
         background-clip: text;
     }
     .sid-auth-lead {
-        color: #94a3b8;
+        color: #ffffff;
         font-size: 0.95rem;
         line-height: 1.55;
         margin: 0 0 1.75rem 0;
@@ -257,46 +258,50 @@ def _guest_auth_theme_css() -> str:
         line-height: 1;
     }
     .sid-auth-feat strong {
-        color: #e2e8f0;
+        color: #ffffff;
         font-size: 0.875rem;
     }
     .sid-auth-feat small {
-        color: #64748b;
+        color: #ffffff;
+        opacity: 0.92;
         font-size: 0.75rem;
     }
     .sid-auth-form-heading h2 {
         margin: 0 0 0.35rem 0;
         font-size: 1.5rem;
         font-weight: 700;
-        color: #0f172a;
+        color: #ffffff;
         letter-spacing: -0.03em;
     }
     .sid-auth-form-heading p {
         margin: 0 0 1rem 0;
         font-size: 0.9rem;
-        color: #64748b;
+        color: #ffffff;
         line-height: 1.45;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .sid-auth-form-heading h2 {
-        color: #f8fafc !important;
+        color: #ffffff !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .sid-auth-form-heading p {
-        color: #cbd5e1 !important;
+        color: #ffffff !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stWidgetLabel"] p,
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stWidgetLabel"] label {
-        color: #f8fafc !important;
+        color: #ffffff !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stCaption"],
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .stCaption {
-        color: #94a3b8 !important;
+        color: #ffffff !important;
+        opacity: 0.95;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .stMarkdown,
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .stMarkdown p {
-        color: #e2e8f0 !important;
+        color: #ffffff !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .stMarkdown a {
-        color: #7dd3fc !important;
+        color: #ffffff !important;
+        text-decoration: underline;
+        text-underline-offset: 2px;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-baseweb="input"] {
         border-radius: 10px !important;
@@ -314,11 +319,11 @@ def _guest_auth_theme_css() -> str:
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .stTabs [data-baseweb="tab"] {
         border-radius: 10px !important;
         font-weight: 600 !important;
-        color: #94a3b8 !important;
+        color: #ffffff !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) .stTabs [aria-selected="true"] {
         background: rgba(51, 65, 85, 0.95) !important;
-        color: #f8fafc !important;
+        color: #ffffff !important;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25) !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stButton"] button[kind="primary"],
@@ -337,8 +342,8 @@ def _guest_auth_theme_css() -> str:
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stButton"] button[kind="secondary"] {
         background: rgba(30, 41, 59, 0.85) !important;
-        border: 1px solid rgba(148, 163, 184, 0.35) !important;
-        color: #e2e8f0 !important;
+        border: 1px solid rgba(255, 255, 255, 0.35) !important;
+        color: #ffffff !important;
         font-weight: 600 !important;
     }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) div[data-testid="stExpander"] {
@@ -349,13 +354,45 @@ def _guest_auth_theme_css() -> str:
     .sid-guest-auth .sid-auth-preview-title {
         font-size: 1.05rem;
         font-weight: 700;
-        color: #0f172a;
+        color: #ffffff;
         margin: 1.25rem 0 0.35rem 0;
     }
     .sid-guest-auth .sid-auth-preview-caption {
         font-size: 0.8rem;
-        color: #64748b;
+        color: #ffffff;
+        opacity: 0.92;
         margin-bottom: 0.5rem;
+    }
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stRadio"] label,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stRadio"] p,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stRadio"] div,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stCheckbox"] label,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stCheckbox"] p {
+        color: #ffffff !important;
+    }
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stExpander"] p,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stExpander"] span,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stExpander"] label,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stExpander"] summary,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stExpander"] div {
+        color: #ffffff !important;
+    }
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-baseweb="input"]::placeholder {
+        color: rgba(255, 255, 255, 0.5) !important;
+    }
+    .sid-guest-auth [data-testid="stAlert"] {
+        background: rgba(30, 41, 59, 0.92) !important;
+        border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    }
+    .sid-guest-auth [data-testid="stAlert"] p,
+    .sid-guest-auth [data-testid="stAlert"] div,
+    .sid-guest-auth [data-testid="stAlert"] span {
+        color: #ffffff !important;
+    }
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stFileUploader"] section small,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stFileUploader"] section p,
+    .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stFileUploader"] label {
+        color: #ffffff !important;
     }
 </style>
 """
@@ -2227,8 +2264,8 @@ else:
                 )
                 st.markdown(
                     '<p style="text-align:right;font-size:0.8rem;margin:-0.5rem 0 0.5rem 0;">'
-                    '<span style="color:#64748b;">Forgot password?</span> '
-                    '<span style="color:#2563eb;font-weight:600;">Use the section below</span></p>',
+                    '<span style="color:#ffffff;">Forgot password?</span> '
+                    '<span style="color:#ffffff;font-weight:600;">Use the section below</span></p>',
                     unsafe_allow_html=True,
                 )
                 if st.button(
@@ -2242,10 +2279,6 @@ else:
                     else:
                         st.error("Invalid email/mobile or password.")
             else:
-                st.caption(
-                    "We send a **code by email** if you enter your sign-in email, or **by SMS** if you enter "
-                    "your registered mobile number (same as when you registered)."
-                )
                 _email_ok = mailer.smtp_configured()
                 _sms_ok = phone_auth.sms_otp_configured()
                 if not _email_ok and not _sms_ok:
@@ -2343,7 +2376,7 @@ else:
 
             st.markdown(
                 '<p style="font-size:0.78rem;margin:0.25rem 0 0.35rem 0;line-height:1.25;'
-                'color:#64748b;">Email reset link</p>',
+                'color:#ffffff;">Email reset link</p>',
                 unsafe_allow_html=True,
             )
             with st.expander("Email a reset link", expanded=False):
@@ -2391,7 +2424,7 @@ else:
                             )
             if g.is_configured():
                 st.markdown(
-                    '<p style="text-align:center;font-size:0.72rem;color:#94a3b8;margin:1rem 0 0.5rem 0;'
+                    '<p style="text-align:center;font-size:0.72rem;color:#ffffff;margin:1rem 0 0.5rem 0;'
                     'letter-spacing:0.14em;font-weight:600;">OR CONTINUE WITH</p>',
                     unsafe_allow_html=True,
                 )
