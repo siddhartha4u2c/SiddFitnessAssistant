@@ -351,18 +351,6 @@ def _guest_auth_theme_css() -> str:
         border-radius: 12px !important;
         background: rgba(15, 23, 42, 0.45) !important;
     }
-    .sid-guest-auth .sid-auth-preview-title {
-        font-size: 1.05rem;
-        font-weight: 700;
-        color: #ffffff;
-        margin: 1.25rem 0 0.35rem 0;
-    }
-    .sid-guest-auth .sid-auth-preview-caption {
-        font-size: 0.8rem;
-        color: #ffffff;
-        opacity: 0.92;
-        margin-bottom: 0.5rem;
-    }
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stRadio"] label,
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stRadio"] p,
     .sid-guest-auth div[data-testid="column"]:has(.sid-auth-form-heading) [data-testid="stRadio"] div,
@@ -2521,10 +2509,3 @@ else:
                             st.success(msg_p)
                         else:
                             st.error(msg_p)
-        st.divider()
-        st.markdown(
-            '<p class="sid-auth-preview-title">App preview</p>'
-            '<p class="sid-auth-preview-caption">Explore the layout below—sign in to use your own data.</p>',
-            unsafe_allow_html=True,
-        )
-        render_main_content()
