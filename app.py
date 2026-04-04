@@ -1413,9 +1413,6 @@ def render_main_content() -> None:
                 )
             else:
                 st.session_state.setdefault("profile_camera_open", False)
-                st.caption(
-                    "Upload a picture, or tap **Take photo** when you want to use the camera (it does not open by itself)."
-                )
                 up_prof = st.file_uploader(
                     "profile_file",
                     type=["jpg", "jpeg", "png"],
@@ -1749,10 +1746,6 @@ def render_main_content() -> None:
 
         if not _prof_ok:
             st.markdown("### My profile — preferences, health, and lifestyle")
-            st.caption(
-                "Scroll below your photo to **Personal** for weight, height, gender, and activity level, "
-                "then **Save profile**."
-            )
             _render_profile_editor()
         else:
             with st.expander("My profile — preferences, health, and lifestyle", expanded=False):
