@@ -145,6 +145,25 @@ def init_db() -> None:
         _ensure_email_verified_column(conn)
         _ensure_goal_tracking_table(conn)
         _ensure_daily_activities_table(conn)
+        _ensure_email_verification_tokens_table(conn)
+
+
+def _ensure_email_verification_tokens_table(conn: sqlite3.Connection) -> None:
+    """Ensure table exists (older DB files before this feature)."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS email_verification_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token_hash TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            used_at TEXT
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verification_token_hash
+            ON email_verification_tokens (token_hash);
+        """
+    )
 
 
 def _ensure_user_columns(conn: sqlite3.Connection) -> None:
@@ -324,6 +343,7 @@ def is_user_email_verified(user_id: int) -> bool:
 
 
 def has_unused_valid_verification_token(user_id: int) -> bool:
+    """True while a sent activation link is still within its validity window (unused and not past ``expires_at``)."""
     now = _utc_now_iso()
     with get_conn() as conn:
         row = conn.execute(
@@ -359,9 +379,12 @@ def create_user(login_email: str, password: str) -> tuple[bool, str]:
         if has_unused_valid_verification_token(existing_id):
             return (
                 False,
-                "A verification link was already sent to this email. Check your inbox and spam—it "
-                "expires in 1 hour. After it expires you can register again.",
+                "An activation link was already sent to this email address. Check your inbox and spam. "
+                "That link is valid for **1 hour**—you cannot register again with this email until it "
+                "expires. After it expires, the old link stops working and you can register again with "
+                "the same email; a **new** activation email will be sent.",
             )
+        # Unverified and no valid pending token (e.g. link expired): remove stale account so they can re-register.
         delete_user_account(existing_id)
     try:
         with get_conn() as conn:
@@ -857,6 +880,15 @@ def add_chat_message(user_id: int, role: str, content: str) -> None:
             """,
             (user_id, role, content, _utc_now_iso()),
         )
+
+
+def count_chat_messages(user_id: int) -> int:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS c FROM chat_messages WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+    return int(row["c"]) if row else 0
 
 
 def list_chat_messages(user_id: int, limit: int = 40) -> list[dict[str, Any]]:

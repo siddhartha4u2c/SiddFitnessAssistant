@@ -75,6 +75,107 @@ def _compact_ui_css() -> str:
     div[data-testid="stFileUploader"] [data-testid="stFileUploaderFileData"] {
         display: none !important;
     }
+    /* Hide Streamlit “Limit … MB per file • JPG, …” under file uploaders */
+    div[data-testid="stFileUploaderDropzoneInstructions"] {
+        display: none !important;
+    }
+    /* Browse files: blue underlined text (not a pill button) */
+    div[data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] {
+        border: none !important;
+        background: transparent !important;
+        min-height: unset !important;
+        padding: 0.2rem 0 !important;
+    }
+    div[data-testid="stFileUploader"] button {
+        padding: 0 !important;
+        min-height: unset !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        color: #1d4ed8 !important;
+        font-weight: 500 !important;
+        font-size: 0.9375rem !important;
+        text-decoration: underline !important;
+        text-underline-offset: 0.2em;
+    }
+    div[data-testid="stFileUploader"] button:hover {
+        color: #1e40af !important;
+        background: transparent !important;
+    }
+    div[data-testid="stFileUploader"] button p,
+    div[data-testid="stFileUploader"] button span {
+        color: inherit !important;
+    }
+    /* Take food / profile photo / Close camera: same link look (tertiary buttons) */
+    div[data-testid="stButton"] button[kind="tertiary"],
+    div[data-testid="stButton"] button[kind="TERTIARY"] {
+        padding: 0 !important;
+        min-height: unset !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        color: #1d4ed8 !important;
+        font-weight: 500 !important;
+        font-size: 0.9375rem !important;
+        text-decoration: underline !important;
+        text-underline-offset: 0.2em;
+    }
+    div[data-testid="stButton"] button[kind="tertiary"]:hover,
+    div[data-testid="stButton"] button[kind="TERTIARY"]:hover {
+        color: #1e40af !important;
+        background: transparent !important;
+    }
+    div[data-testid="stButton"] button[kind="tertiary"]:disabled,
+    div[data-testid="stButton"] button[kind="TERTIARY"]:disabled {
+        color: #94a3b8 !important;
+        opacity: 1 !important;
+    }
+    div[data-testid="stButton"] button[kind="tertiary"] p,
+    div[data-testid="stButton"] button[kind="tertiary"] span,
+    div[data-testid="stButton"] button[kind="TERTIARY"] p,
+    div[data-testid="stButton"] button[kind="TERTIARY"] span {
+        color: inherit !important;
+    }
+    /* Camera widget capture / switch camera */
+    button[data-testid="stCameraInputButton"],
+    button[data-testid="stCameraInputSwitchButton"] {
+        padding: 0 0.25rem !important;
+        min-height: unset !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        color: #1d4ed8 !important;
+        font-weight: 500 !important;
+        font-size: 0.9375rem !important;
+        text-decoration: underline !important;
+        text-underline-offset: 0.2em;
+    }
+    button[data-testid="stCameraInputButton"]:hover,
+    button[data-testid="stCameraInputSwitchButton"]:hover {
+        color: #1e40af !important;
+        background: transparent !important;
+    }
+    button[data-testid="stCameraInputButton"] p,
+    button[data-testid="stCameraInputButton"] span,
+    button[data-testid="stCameraInputSwitchButton"] p,
+    button[data-testid="stCameraInputSwitchButton"] span {
+        color: inherit !important;
+    }
+    /* Coach chat: round avatar on assistant bubbles */
+    div[data-testid="stChatMessage"] img {
+        border-radius: 50%;
+        object-fit: cover;
+    }
+    /* Coach chat input placeholder: “Ask the coach…” in dark blue */
+    div[data-testid="stChatInput"] textarea::placeholder,
+    div[data-testid="stChatInput"] input::placeholder {
+        color: #1e3a8a !important;
+        opacity: 1 !important;
+        font-weight: 600 !important;
+    }
 </style>
 """
 
@@ -537,6 +638,13 @@ Recommendation:
   Do not recommend **beef** (or beef-based products) as an addition or swap.
 """
 
+
+def _coach_chat_avatar_path() -> str | None:
+    """PNG next to coach replies in chat (``assets/coach_ai_avatar.png``)."""
+    p = Path(__file__).resolve().parent / "assets" / "coach_ai_avatar.png"
+    return str(p) if p.is_file() else None
+
+
 COACH_SYSTEM = """You are a supportive nutrition and lifestyle coach who sounds like a real person—warm,
 direct, and human—not a bot or a lecture. Your answers must be:
 - Realistic and practical; avoid extreme or magical claims.
@@ -595,6 +703,155 @@ GOAL TIMELINE & PROGRESS: A **GOAL TIMELINE** section lists dated moments when t
 
 If information is missing, say what would help. Reference weight trends only when the log supports it.
 Keep replies readable; use more detail when the user requests full-day or multi-day plans."""
+
+# Evidence-informed defaults for muscle hypertrophy (use when goal/training/protein questions fit; still personalize to profile, diet pattern, allergies, and energy context).
+COACH_MUSCLE_GAIN_REFERENCE = """
+=== SCIENCE-BASED MUSCLE GROWTH REFERENCE (hypertrophy) ===
+Use this when the user’s goal, question, or context involves **muscle gain**, **strength training**, **gym work**, or **physique**. It summarizes physiology and training principles (not bro-science). Always **adapt** to their **diet pattern** (veg/vegan/etc.), **allergies**, **health notes**, and **saved profile**—this block does not override those.
+
+**How muscle grows**
+- Hypertrophy: training causes small amounts of muscle disruption; repair/adaptation during **rest** makes tissue stronger/larger over time.
+- Net **muscle protein synthesis** must favor building over breakdown for growth; nutrition and recovery matter.
+
+**Training (primary stimulus)**
+- **Resistance training** (weights or challenging bodyweight) is the main driver of muscle growth.
+- **Progressive overload**: over time increase **load**, **reps**, or **sets** (or quality/tempo). Same load forever → limited stimulus for growth.
+- Common rep brackets: ~**6–12** often used for hypertrophy; lower reps bias strength; very high reps bias endurance. Pick loads that feel **hard** near the last reps of a set.
+- Structure: mix **compound** (e.g. squat, hinge, press, row patterns) and **isolation**; roughly **3–5 movements** per session is a typical range unless the user needs simpler.
+- Frequency: each muscle or pattern about **2–3×/week** is a common guideline; **~3–5** total training days/week fits many programs (adjust to their schedule and recovery).
+
+**Nutrition**
+- **Protein**: often cited **~1.4–2.0 g/kg body weight/day** for muscle gain context (use their **logged or profile weight**; respect vegetarian/vegan/pescatarian sources: eggs, dairy, fish, poultry, legumes, soy, paneer/curd, nuts, etc.).
+- **Energy**: a **modest surplus** is usually needed to maximize lean gain; too little energy → harder to build tissue. Tie surplus size to goal, activity, and preference—avoid extreme “dirty bulk” framing.
+- **Carbs** support training performance; **fats** support hormones and overall health—keep both in the picture.
+
+**Recovery**
+- Growth is supported by **sleep** (~**7–9 h** for many adults) and **rest days** (~**1–2**/week or as needed). Poor sleep/recovery undermines progress.
+
+**Intensity / effort**
+- Many coaches use **1–2 reps in reserve** (stop a bit before absolute failure) for sustainable hard training—not every set to failure.
+
+**Expectations**
+- **Beginners** often see faster initial changes; **~0.5–1 kg** lean mass per month is sometimes cited as an upper-ish rough range for favorable conditions; **advanced** trainees gain slower.
+- **Visible** changes often take **~8–12+ weeks** of consistency; avoid promising unrealistic speed.
+
+**Common mistakes to gently steer away from**
+- Too little **protein** or chronic **under-eating** for the goal.
+- **Program hopping** every week (no progression story).
+- Loads **too light** for the rep targets (no progression).
+- **Chronic poor sleep** or no rest.
+- Expecting **transformations** in days or a couple of weeks.
+
+Fold this into **natural language**; cite these ideas only when useful—do not dump the whole list unless they asked for an overview.
+"""
+
+# Weight on the scale vs improving body composition (use for fat loss, cutting, “lose weight”, scale obsession).
+COACH_FAT_LOSS_VS_WEIGHT_REFERENCE = """
+=== WEIGHT LOSS VS FAT LOSS (body composition) ===
+Use when the user cares about **losing weight**, **fat loss**, **getting lean**, **toned**, **cutting**, or **scale weight**. Keep language simple. **Personalize** to profile (diet pattern, allergies, health notes, energy context)—this block does not override those.
+
+**Definitions**
+- **Weight loss** = total **body mass** down on the scale. That change can come from **fat**, **lean tissue (muscle)**, **water**, **glycogen**, or **digestive contents**—the scale alone does not say which.
+- **Fat loss** = reducing **fat mass** while **protecting or building lean mass** where possible. This is usually what people mean by “look leaner / more toned / better shape.”
+
+**Why it matters**
+- **Scale-only** focus with very low calories and no strength work risks **muscle loss**, **slower metabolism** (partly from smaller lean mass), and sometimes a **“skinny fat”** look (lower weight but less muscle).
+- **Fat-loss-focused** approach: **adequate protein**, **resistance training**, **moderate sustainable deficit** → better odds of **preserving muscle**, **strength**, and **shape**.
+
+**Illustrative contrast (not a promise for any individual)**
+- Two people might lose the **same** scale weight but differ in **how much** came from fat vs muscle, depending on deficit size, protein, and training.
+
+**Body composition**
+- Think in terms of **fat mass** vs **lean mass** (muscle, organs, bone, water). **Improving composition** (less fat, retain muscle) is often a better framing than “smallest possible number” alone.
+
+**Practical pillars for fat loss (not just weight loss)**
+1. **Strength / resistance training** — helps **retain muscle** and supports long-term calorie burn and function; avoid “only cardio + crash diet” as the default story.
+2. **Higher protein** (contextual; often **~1.2–1.6+ g/kg/day** in deficits is discussed in evidence for retention—**adapt** to their weight, pattern, and preferences) — supports muscle and **satiety**.
+3. **Moderate calorie deficit** — **sustainable** fat loss; avoid glorifying extreme restriction; tie to **TDEE/profile** when you have it.
+4. **Progress beyond the scale** — **photos**, **measurements**, **clothes fit**, **strength or performance**, and **trend** over weeks; **daily weight fluctuates** with water and salt.
+
+**Bottom line for coaching tone**
+- **Scale down** ≠ automatically **success** if muscle and adherence suffer.
+- Prefer: **lose fat, keep muscle** (or build muscle in beginners/recomp cases) when the user’s goal is leanness or “tone.” Say this in **plain, kind** language—not lecture.
+
+Use only what fits the question; do not recite the whole block unless they want a clear explainer.
+"""
+
+# “Detox” myths vs drinks that may modestly support habits (hydration, satiety)—no magic fat melting.
+COACH_DRINKS_DETOX_REFERENCE = """
+=== DRINKS, “DETOX,” AND FAT LOSS (myth-bust + sensible habits) ===
+Use when the user asks about **detox drinks**, **fat-cutter juices**, **cleanses**, **ACV**, **jeera water**, **lemon water**, **green tea**, **coffee**, **infused water**, or **protein shakes** for weight/fat loss. Stay **non-medical**; respect **allergies**, **GERD/acid sensitivity**, **caffeine limits**, **pregnancy/breastfeeding** (defer to their clinician if relevant), and **diet pattern**.
+
+**Core message**
+- There is **no true “detox drink”** that flushes toxins the body can’t already handle. **Liver** and **kidneys** do the main clearing; no beverage replaces them.
+- Marketed **“detox / fat-cutter / miracle”** products are usually **oversold**; long-term safety and benefit are often **unproven**—gently discourage reliance on them.
+
+**What some drinks can do (indirectly, modestly)**
+- Support **hydration**, **habit stacking**, **digestive comfort**, **appetite** (slightly), or **alertness** for training—not **magic fat burn**.
+
+**Reasonable options (when they fit the person)**
+- **Water / lemon water** — hydration; morning habit OK; **not** a fat burner by itself.
+- **Green tea** — antioxidants; **mild caffeine**; evidence for **small** effects on energy balance for some people—not a substitute for deficit + training + protein.
+- **Black coffee** — caffeine can aid **alertness** and **workout performance**; **no sugar**; watch **sleep**, **anxiety**, **acid reflux**; time caffeine away from bed.
+- **Jeera (cumin) water** — traditional; may help **bloating/digestion** for some; keep expectations modest.
+- **Apple cider vinegar (diluted)** — some trials suggest **small** appetite effects; **dilute well**, **don’t overuse** (tooth enamel, stomach irritation); skip or warn if **reflux/ulcer** concerns.
+- **Infused water** (cucumber–mint, lemon–ginger, etc.) — mainly makes **plain water easier to drink** → better hydration; still not detox magic.
+- **Protein shakes** — **not** detox; often **useful** for hitting **protein** and **fullness** in a deficit; choose options aligned with **diet pattern** (dairy or plant protein as appropriate).
+
+**Discourage**
+- **“Fat cutter juices,”** **7-day detox cures,** **herbal miracle** claims — often **no durable benefit**, possible **harms** or **wasted money**; redirect to **calories, protein, training, sleep, consistency**.
+
+Keep tone **kind and practical**; don’t mock the user for trying trends—**reframe** toward what actually moves composition.
+"""
+
+# Simple, culturally familiar snacks tied to energy for training (not magic strength boosters).
+COACH_STRENGTH_SNACKS_REFERENCE = """
+=== FOODS THAT CAN SUPPORT TRAINING ENERGY & STRENGTH HABITS ===
+Use when the user asks about **what to eat for strength**, **pre-workout snacks**, **Indian home foods**, or **natural** options. These are **practical additions** to a plan that already includes **protein**, **training**, and **sleep**—not replacements. Respect **diet pattern**, **allergies**, **diabetes / blood-sugar** context (adjust portions or skip jaggery if their clinician advises), and **digestive tolerance**.
+
+**1. Boiled black chickpeas (kala chana) with jaggery**
+- **Chickpeas**: **plant protein**, **fiber**, **slow carbs**—useful as a snack or small meal around training days.
+- **Jaggery**: adds **quick carbs** and traditional flavor; keep **portion modest** (calories add up); vegan-friendly.
+- Suggest **well-cooked, drained** chickpeas; optional **soak + boil** for digestibility.
+
+**2. Bananas before a workout (~2, if it fits the person)**
+- **Fast, easy carbs** + **potassium**; common **pre-workout** choice about **30–60 minutes** before harder sessions (tune to their **gut**: some people prefer one banana or half if bloated).
+- Not mandatory—other fruit, rice, roti, or a small balanced snack can work too.
+
+**Coaching tone**
+- Present as **options** that fit many **vegetarian / vegan** kitchens; **never** claim these alone **build strength** without **progressive training** and **overall nutrition**.
+"""
+
+# Common Indian breakfast/snack items users may want to limit during a deficit (calorie density / easy overeating)—not “banned foods.”
+COACH_FAT_LOSS_FOOD_LIMITS_REFERENCE = """
+=== FOODS OFTEN WORTH LIMITING OR WATCHING DURING FAT LOSS ===
+Use when the user asks what to **avoid**, **cut**, or **reduce while losing weight**—especially **Indian home foods**. **No food is inherently “fattening”** in a tiny portion; fat loss is **overall calories** + **protein** + **habits**. These are **practical cautions** for people who struggle with **portion control** or a **tight calorie budget**. Respect **diet pattern** (vegan: skip dairy notes or swap to plant milk), **lactose intolerance**, **allergies**, and **diabetes** (carb timing with their care team).
+
+**1. Daliya (broken wheat) with milk**
+- Often a **healthy-sounding** meal but **calories add up** from **milk volume** (especially **full-fat**), **second helpings**, or extras like **sugar, ghee, or dry fruits**.
+- Suggest **measuring** daliya and milk, **one bowl**, **lower-fat or fortified plant milk** if it fits them, **less or no added sugar**, or swapping some meals to **higher-protein, veg-forward** options if they’re **stalling** on a deficit.
+- **Not** “never”—**fit it into the day’s calories** if they love it.
+
+**2. Bananas**
+- **Nutritious** (fiber, potassium) but **relatively energy-dense** for fruit; easy to eat **several** or pair with other carbs and overshoot a **small deficit**.
+- During aggressive fat loss or **very low daily carbs**, some people **prioritize lower-calorie fruits** (berries, papaya, citrus) or **half a banana** at a time.
+- **Contrast**: before **hard training**, a banana can still be a **sensible fuel**—context matters; don’t contradict **strength / pre-workout** guidance when they’re active.
+
+**3. Mango**
+- **Seasonal treat** with vitamins and fiber, but **sugar and calories rise fast** with **large slices**, **aamras**, **lassi**, **ice cream**, or **several mangoes a day**.
+- Suggest **counting as part of daily carbs/calories**, **fixed portion** (e.g. a **small bowl** or **few slices**), and **avoiding “unlimited”** grazing during mango season.
+
+**4. Dates**
+- **Very calorie-dense** and **easy to overeat** (smoothies, ladoos, “healthy” energy balls, breaking fast with many at once).
+- Useful in **small amounts** for some people; for fat loss, suggest **limiting number per day**, **not eating mindlessly from the box**, and **logging** them like any other carb.
+
+**5. Refined sugar products**
+- **Added sugars** (white/brown sugar, **sweets, mithai, packaged biscuits, sodas, flavored yogurts, many sauces**) add **calories with little fullness or protein**—easy to **overshoot a deficit** without noticing.
+- Encourage **gradual reduction**, **reading labels**, **water/unsweetened drinks**, and **fruit or modest jaggery/honey only if it fits their plan**—without shaming cultural sweets; focus on **frequency and portion**.
+
+**Tone**
+- **Kind, non-moralizing**—avoid “bad food” language; emphasize **portions**, **frequency**, and **what fits their calorie and protein targets**.
+"""
 
 
 def profile_to_blurb(p: dict) -> str:
@@ -954,7 +1211,11 @@ def build_coach_prompt(
     login_id = db.get_username(user_id) or ""
 
     return f"""{COACH_SYSTEM}
-
+{COACH_MUSCLE_GAIN_REFERENCE}
+{COACH_FAT_LOSS_VS_WEIGHT_REFERENCE}
+{COACH_DRINKS_DETOX_REFERENCE}
+{COACH_STRENGTH_SNACKS_REFERENCE}
+{COACH_FAT_LOSS_FOOD_LIMITS_REFERENCE}
 === PROFILE CONTEXT (this turn) ===
 - Data below was read from the database when the user sent this message (latest saves apply).
 - Account sign-in email: {login_id}
@@ -1424,6 +1685,19 @@ def render_main_content() -> None:
                     key=_prof_up_key,
                     label_visibility="collapsed",
                 )
+                if st.button(
+                    "Remove profile photo",
+                    key="btn_remove_profile_photo",
+                    type="tertiary",
+                ):
+                    db.remove_profile_image(uid)
+                    st.session_state["profile_camera_open"] = False
+                    st.session_state.profile_photo_cam_widget_key = (
+                        int(st.session_state.get("profile_photo_cam_widget_key", 0)) + 1
+                    )
+                    st.session_state["profile_photo_uploader_key"] = _prof_upload_k + 1
+                    st.success("Profile photo removed.")
+                    st.rerun()
             else:
                 st.session_state.setdefault("profile_camera_open", False)
                 up_prof = st.file_uploader(
@@ -1432,11 +1706,34 @@ def render_main_content() -> None:
                     key=_prof_up_key,
                     label_visibility="collapsed",
                 )
-                if st.button("Take photo", key="btn_profile_open_camera"):
+                st.markdown(
+                    '<div class="sid-profile-photo-placeholder" title="No profile photo yet" '
+                    'style="width:140px;max-width:100%;aspect-ratio:1;box-sizing:border-box;'
+                    "border:2px dashed #cbd5e1;border-radius:12px;background:#f8fafc;"
+                    "display:flex;align-items:center;justify-content:center;margin:0.5rem 0 0.75rem 0;"
+                    'color:#94a3b8;">'
+                    '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" '
+                    'stroke="currentColor" stroke-width="1.5" stroke-linecap="round" '
+                    'stroke-linejoin="round" aria-hidden="true">'
+                    "<rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\"/>"
+                    "<circle cx=\"8.5\" cy=\"10\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\"/>"
+                    '<path d="M3 17l5-5 4 4 5-6 4 4"/>'
+                    "</svg></div>",
+                    unsafe_allow_html=True,
+                )
+                if st.button(
+                    "Take profile photo",
+                    key="btn_profile_open_camera",
+                    type="tertiary",
+                ):
                     st.session_state["profile_camera_open"] = True
                     st.rerun()
                 if st.session_state.get("profile_camera_open"):
-                    if st.button("Close camera", key="btn_profile_close_camera"):
+                    if st.button(
+                        "Close camera",
+                        key="btn_profile_close_camera",
+                        type="tertiary",
+                    ):
                         st.session_state["profile_camera_open"] = False
                         st.session_state.profile_photo_cam_widget_key = (
                             int(st.session_state.get("profile_photo_cam_widget_key", 0)) + 1
@@ -1448,16 +1745,6 @@ def render_main_content() -> None:
                         key=f"profile_photo_camera_{_cam_wkey}",
                         label_visibility="collapsed",
                     )
-            if _has_prof_photo:
-                if st.button("Take profile photo", key="btn_remove_profile_photo"):
-                    db.remove_profile_image(uid)
-                    st.session_state["profile_camera_open"] = False
-                    st.session_state.profile_photo_cam_widget_key = (
-                        int(st.session_state.get("profile_photo_cam_widget_key", 0)) + 1
-                    )
-                    st.session_state["profile_photo_uploader_key"] = _prof_upload_k + 1
-                    st.success("Profile photo removed.")
-                    st.rerun()
 
             _photo_saved = False
             if up_prof is not None:
@@ -2092,128 +2379,158 @@ def render_main_content() -> None:
                 st.success("Weight entry saved.")
 
     if uid:
-        show_coach = st.checkbox(
-            "Show coach chat (reloads your saved profile, weights & meals for every reply)",
-            key="toggle_coach_chat",
+        st.markdown("##### Progress photo for coach")
+        _cup = int(st.session_state.get("coach_progress_uploader_key", 0))
+        prog_up = st.file_uploader(
+            "Upload progress / body photo",
+            type=["jpg", "jpeg", "png"],
+            key=f"coach_progress_upload_{_cup}",
         )
-        if show_coach:
-            st.markdown("##### Progress photo for coach")
-            st.caption(
-                "Optional: upload a **current body / progress** picture so the coach can comment in context of "
-                "your goal, goal timeline, and weight log. Photos are only a rough guide—lighting and angle matter; "
-                "use your scale log for hard numbers. Not medical advice."
-            )
-            _cup = int(st.session_state.get("coach_progress_uploader_key", 0))
-            prog_up = st.file_uploader(
-                "Upload progress / body photo",
-                type=["jpg", "jpeg", "png"],
-                key=f"coach_progress_upload_{_cup}",
-            )
-            coach_photo_note = st.text_input(
-                "Optional note for the coach (pose, lighting, how long since last photo, etc.)",
-                key="coach_progress_photo_note",
-            )
-            attach_photo_to_next = st.checkbox(
-                "Include this photo with my next message in the chat below",
-                key="coach_attach_photo_next_msg",
-            )
-            _coach_review_default_q = (
-                "Please review my progress photo together with my profile goal, goal timeline, and weight log. "
-                "From what you can see (knowing photos are imperfect), does it seem I'm moving in a reasonable "
-                "direction for my goal—or is that unclear? If you need more to judge, ask for current scale weight, "
-                "a measurement, or training consistency."
-            )
-            if st.button(
-                "Ask coach to review this photo",
-                key="btn_coach_review_photo",
-                use_container_width=True,
-                type="secondary",
-            ):
-                if prog_up is None:
-                    st.warning("Choose a photo first.")
-                else:
-                    b = prog_up.getvalue()
-                    mime = _coach_image_mime(getattr(prog_up, "type", None))
-                    note = (coach_photo_note or "").strip()
-                    full_q = (
-                        f"{note}\n\n{_coach_review_default_q}" if note else _coach_review_default_q
-                    )
-                    db.record_chat_goal_mention_if_relevant(uid, full_q)
-                    coach_prompt = build_coach_prompt(
-                        uid, full_q, body_photo_attached=True
-                    )
-                    answer = ""
-                    try:
+        coach_photo_note = st.text_input(
+            "Optional note for the coach (pose, lighting, how long since last photo, etc.)",
+            key="coach_progress_photo_note",
+        )
+        attach_photo_to_next = st.checkbox(
+            "Include this photo with my next message in the chat below",
+            key="coach_attach_photo_next_msg",
+        )
+        _coach_review_default_q = (
+            "Please review my progress photo together with my profile goal, goal timeline, and weight log. "
+            "From what you can see (knowing photos are imperfect), does it seem I'm moving in a reasonable "
+            "direction for my goal—or is that unclear? If you need more to judge, ask for current scale weight, "
+            "a measurement, or training consistency."
+        )
+        if st.button(
+            "Ask coach to review this photo",
+            key="btn_coach_review_photo",
+            use_container_width=True,
+            type="secondary",
+        ):
+            if prog_up is None:
+                st.warning("Choose a photo first.")
+            else:
+                b = prog_up.getvalue()
+                mime = _coach_image_mime(getattr(prog_up, "type", None))
+                note = (coach_photo_note or "").strip()
+                full_q = (
+                    f"{note}\n\n{_coach_review_default_q}" if note else _coach_review_default_q
+                )
+                db.record_chat_goal_mention_if_relevant(uid, full_q)
+                coach_prompt = build_coach_prompt(
+                    uid, full_q, body_photo_attached=True
+                )
+                answer = ""
+                _cav_photo = _coach_chat_avatar_path()
+                try:
+                    _rv1, _rv2 = st.columns([0.09, 0.91])
+                    with _rv1:
+                        if _cav_photo:
+                            st.image(_cav_photo, width=52)
+                    with _rv2:
                         with st.spinner("Coach is reviewing your photo…"):
                             coach_resp = model.generate_content(
                                 coach_prompt,
                                 image_bytes=b,
                                 image_mime=mime,
                             )
-                        try:
-                            answer = (coach_resp.text or "").strip()
-                        except ValueError:
-                            answer = ""
-                    except Exception as exc:
-                        answer = (
-                            "Sorry, the coach request failed (network, quota, API, or this model may not support "
-                            f"images). Details: {exc}"
-                        )
-                    if not answer:
-                        answer = (
-                            "No text response (content may have been blocked or the model returned no text)."
-                        )
-                    user_line = "📷 Progress photo — coach review."
-                    if note:
-                        user_line += f"\nNote: {note}"
-                    db.add_chat_message(uid, "user", user_line)
-                    db.add_chat_message(uid, "assistant", answer)
-                    st.session_state["coach_progress_uploader_key"] = _cup + 1
-                    st.rerun()
-
-            msgs = db.list_chat_messages(uid, 40)
-            for m in msgs:
-                with st.chat_message("user" if m["role"] == "user" else "assistant"):
-                    st.write(m["content"])
-
-            if coach_q := st.chat_input("Ask the coach…"):
-                img_bytes: bytes | None = None
-                img_mime = "image/jpeg"
-                if prog_up is not None and attach_photo_to_next:
-                    img_bytes = prog_up.getvalue()
-                    img_mime = _coach_image_mime(getattr(prog_up, "type", None))
-                db.record_chat_goal_mention_if_relevant(uid, coach_q)
-                coach_prompt = build_coach_prompt(
-                    uid, coach_q, body_photo_attached=img_bytes is not None
-                )
-                answer = ""
-                try:
-                    with st.spinner("Coach is thinking…"):
-                        coach_resp = model.generate_content(
-                            coach_prompt,
-                            image_bytes=img_bytes,
-                            image_mime=img_mime,
-                        )
                     try:
                         answer = (coach_resp.text or "").strip()
                     except ValueError:
                         answer = ""
                 except Exception as exc:
                     answer = (
-                        "Sorry, the coach request failed (network, quota, or API). "
-                        f"Details: {exc}"
+                        "Sorry, the coach request failed (network, quota, API, or this model may not support "
+                        f"images). Details: {exc}"
                     )
                 if not answer:
-                    answer = "No text response (content may have been blocked)."
-                user_chat_line = (
-                    f"📷 [Photo attached] {coach_q}" if img_bytes else coach_q
-                )
-                db.add_chat_message(uid, "user", user_chat_line)
+                    answer = (
+                        "No text response (content may have been blocked or the model returned no text)."
+                    )
+                user_line = "📷 Progress photo — coach review."
+                if note:
+                    user_line += f"\nNote: {note}"
+                db.add_chat_message(uid, "user", user_line)
                 db.add_chat_message(uid, "assistant", answer)
-                if img_bytes is not None and attach_photo_to_next:
-                    st.session_state["coach_progress_uploader_key"] = _cup + 1
+                st.session_state["coach_progress_uploader_key"] = _cup + 1
                 st.rerun()
-    
+
+        show_coach_history = st.checkbox(
+            "Show coach chat (previous messages only)",
+            key="toggle_coach_chat",
+            help="Past messages appear above when enabled. The chat box below is always available; each reply still uses your latest profile and logs.",
+        )
+        if show_coach_history:
+            _coach_av = _coach_chat_avatar_path()
+            if "coach_visible_msg_count" not in st.session_state:
+                st.session_state.coach_visible_msg_count = 5
+
+            _coach_msg_total = db.count_chat_messages(uid)
+            if _coach_msg_total > 0:
+                _vis = min(int(st.session_state.coach_visible_msg_count), _coach_msg_total)
+                _older_hidden = _coach_msg_total - _vis
+                if _older_hidden > 0:
+                    if st.button(
+                        f"Show 5 more previous chats ({_older_hidden} older hidden)",
+                        key="btn_coach_load_more_history",
+                    ):
+                        st.session_state.coach_visible_msg_count = _vis + 5
+                        st.rerun()
+                msgs = db.list_chat_messages(uid, limit=_vis)
+            else:
+                msgs = []
+
+            for m in msgs:
+                is_u = m["role"] == "user"
+                _kw: dict = {}
+                if not is_u and _coach_av:
+                    _kw["avatar"] = _coach_av
+                with st.chat_message("user" if is_u else "assistant", **_kw):
+                    st.write(m["content"])
+
+        if coach_q := st.chat_input("Ask the coach…"):
+            img_bytes: bytes | None = None
+            img_mime = "image/jpeg"
+            if prog_up is not None and attach_photo_to_next:
+                img_bytes = prog_up.getvalue()
+                img_mime = _coach_image_mime(getattr(prog_up, "type", None))
+            db.record_chat_goal_mention_if_relevant(uid, coach_q)
+            coach_prompt = build_coach_prompt(
+                uid, coach_q, body_photo_attached=img_bytes is not None
+            )
+            answer = ""
+            _cav_chat = _coach_chat_avatar_path()
+            try:
+                _th1, _th2 = st.columns([0.09, 0.91])
+                with _th1:
+                    if _cav_chat:
+                        st.image(_cav_chat, width=52)
+                with _th2:
+                    with st.spinner("Coach is thinking…"):
+                        coach_resp = model.generate_content(
+                            coach_prompt,
+                            image_bytes=img_bytes,
+                            image_mime=img_mime,
+                        )
+                try:
+                    answer = (coach_resp.text or "").strip()
+                except ValueError:
+                    answer = ""
+            except Exception as exc:
+                answer = (
+                    "Sorry, the coach request failed (network, quota, or API). "
+                    f"Details: {exc}"
+                )
+            if not answer:
+                answer = "No text response (content may have been blocked)."
+            user_chat_line = (
+                f"📷 [Photo attached] {coach_q}" if img_bytes else coach_q
+            )
+            db.add_chat_message(uid, "user", user_chat_line)
+            db.add_chat_message(uid, "assistant", answer)
+            if img_bytes is not None and attach_photo_to_next:
+                st.session_state["coach_progress_uploader_key"] = _cup + 1
+            st.rerun()
+
         st.divider()
     
     food_description = st.text_area(
@@ -2250,11 +2567,21 @@ def render_main_content() -> None:
         )
     with _cam_btn:
         if not st.session_state.meal_camera_open:
-            if st.button("Take food photo", key="btn_meal_cam_open", disabled=not active):
+            if st.button(
+                "Take food photo",
+                key="btn_meal_cam_open",
+                type="tertiary",
+                disabled=not active,
+            ):
                 st.session_state.meal_camera_open = True
                 st.rerun()
         else:
-            if st.button("Close camera", key="btn_meal_cam_close", disabled=not active):
+            if st.button(
+                "Close camera",
+                key="btn_meal_cam_close",
+                type="tertiary",
+                disabled=not active,
+            ):
                 st.session_state.meal_camera_open = False
                 st.session_state.meal_estimate_cam_widget_key = (
                     int(st.session_state.get("meal_estimate_cam_widget_key", 0)) + 1
@@ -2469,10 +2796,6 @@ else:
                                 "Nothing else is shown for privacy."
                             )
         with tab_reg:
-            st.caption(
-                "Create an account with your **email** and a password. We will email you an "
-                "activation link (valid **1 hour**); you can sign in only after you open it."
-            )
             reg_em = st.text_input(
                 "Email",
                 key="reg_unified_email",
