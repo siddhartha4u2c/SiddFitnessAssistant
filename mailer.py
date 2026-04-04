@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import socket
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -14,11 +15,12 @@ def _smtp_password() -> str:
 
 
 def smtp_configured() -> bool:
+    user = (os.getenv("SMTP_USERNAME") or "").strip()
     return bool(
-        os.getenv("SMTP_SERVER")
-        and os.getenv("SMTP_USERNAME")
+        (os.getenv("SMTP_SERVER") or "smtp.gmail.com").strip()
+        and user
         and _smtp_password()
-        and (os.getenv("MAIL_DEFAULT_SENDER") or os.getenv("SMTP_USERNAME"))
+        and (os.getenv("MAIL_DEFAULT_SENDER") or user).strip()
     )
 
 
@@ -28,7 +30,7 @@ def send_password_reset_email(
     *,
     username_hint: str | None = None,
 ) -> None:
-    server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    server = (os.getenv("SMTP_SERVER") or "smtp.gmail.com").strip()
     port = int(os.getenv("SMTP_PORT") or "587")
     user = os.getenv("SMTP_USERNAME", "").strip()
     password = _smtp_password()
@@ -57,7 +59,25 @@ This message was sent from an automated address. Do not reply.
     msg["To"] = to_address
     msg.attach(MIMEText(body, "plain", "utf-8"))
 
-    with smtplib.SMTP(server, port, timeout=30) as smtp:
-        smtp.starttls()
-        smtp.login(user, password)
-        smtp.sendmail(sender, [to_address], msg.as_string())
+    _dns_err = (
+        f"Cannot reach mail server {server!r}: your system could not resolve that hostname "
+        f"(DNS/network). In .env set SMTP_SERVER to a valid host with no typos—e.g. "
+        f"smtp.gmail.com for Gmail—and check internet access. Underlying error: {{}}"
+    )
+
+    try:
+        with smtplib.SMTP(server, port, timeout=30) as smtp:
+            smtp.starttls()
+            smtp.login(user, password)
+            smtp.sendmail(sender, [to_address], msg.as_string())
+    except socket.gaierror as e:
+        raise RuntimeError(_dns_err.format(e)) from e
+    except OSError as e:
+        # Linux often errno -2; Windows often 11001 (WSAHOST_NOT_FOUND) for bad hostname.
+        code = getattr(e, "errno", None)
+        win = getattr(e, "winerror", None)
+        if code == -2 or win in (11001, 11002, 11003) or "Name or service not known" in str(
+            e
+        ):
+            raise RuntimeError(_dns_err.format(e)) from e
+        raise
