@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import hmac
-import os
 import re
 import secrets
 import sqlite3
@@ -35,35 +33,6 @@ def _bcrypt_secret(password: str) -> str:
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-
-
-def _session_stale_delta() -> timedelta:
-    try:
-        m = int(os.getenv("SINGLE_SESSION_STALE_MINUTES", "15"))
-    except ValueError:
-        m = 15
-    return timedelta(minutes=max(1, m))
-
-
-def _parse_iso_dt_utc(s: str | None) -> datetime | None:
-    if not s or not str(s).strip():
-        return None
-    try:
-        t = str(s).strip().replace("Z", "+00:00")
-        dt = datetime.fromisoformat(t)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc)
-    except ValueError:
-        return None
-
-
-def _session_tokens_equal(a: str | None, b: str | None) -> bool:
-    if not a or not b:
-        return False
-    if len(a) != len(b):
-        return False
-    return hmac.compare_digest(a.encode("utf-8"), b.encode("utf-8"))
 
 
 @contextmanager
@@ -174,7 +143,6 @@ def init_db() -> None:
         _ensure_profile_columns(conn)
         _ensure_user_columns(conn)
         _ensure_email_verified_column(conn)
-        _ensure_session_columns(conn)
         _ensure_goal_tracking_table(conn)
         _ensure_daily_activities_table(conn)
         _ensure_email_verification_tokens_table(conn)
@@ -222,14 +190,6 @@ def _ensure_email_verified_column(conn: sqlite3.Connection) -> None:
         conn.execute(
             "UPDATE users SET email_verified_at = created_at WHERE email_verified_at IS NULL"
         )
-
-
-def _ensure_session_columns(conn: sqlite3.Connection) -> None:
-    cols = {row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
-    if "session_token" not in cols:
-        conn.execute("ALTER TABLE users ADD COLUMN session_token TEXT")
-    if "session_last_seen_at" not in cols:
-        conn.execute("ALTER TABLE users ADD COLUMN session_last_seen_at TEXT")
 
 
 def _ensure_daily_activities_table(conn: sqlite3.Connection) -> None:
@@ -477,90 +437,6 @@ def try_email_password_sign_in(login: str, password: str) -> tuple[int | None, s
     if ev is None or str(ev).strip() == "":
         return None, "unverified"
     return int(row["id"]), None
-
-
-def try_email_password_sign_in_reserve_session(
-    login: str, password: str,
-) -> tuple[int | None, str]:
-    """Sign in and allocate server-side session token (single active session).
-
-    On success returns ``(user_id, session_token)``. On failure ``(None, reason)`` where
-    ``reason`` is ``invalid``, ``unverified``, or ``session_active``.
-    """
-    s = (login or "").strip()
-    if not s or "@" not in s:
-        return None, "invalid"
-    if not is_valid_login_email(s):
-        return None, "invalid"
-    login_email = normalize_login_email(s)
-    stale = _session_stale_delta()
-    now = datetime.now(timezone.utc)
-    with get_conn() as conn:
-        row = conn.execute(
-            """
-            SELECT id, password_hash, email_verified_at, session_token, session_last_seen_at
-            FROM users WHERE username = ? COLLATE NOCASE
-            """,
-            (login_email,),
-        ).fetchone()
-    if row is None:
-        return None, "invalid"
-    if not bcrypt.verify(_bcrypt_secret(password), row["password_hash"]):
-        return None, "invalid"
-    ev = row["email_verified_at"]
-    if ev is None or str(ev).strip() == "":
-        return None, "unverified"
-    uid = int(row["id"])
-    stok = row["session_token"]
-    lsa = row["session_last_seen_at"]
-    if stok and str(stok).strip():
-        seen = _parse_iso_dt_utc(lsa)
-        if seen is not None and (now - seen) < stale:
-            return None, "session_active"
-    new_tok = secrets.token_urlsafe(32)
-    with get_conn() as conn:
-        conn.execute(
-            """
-            UPDATE users SET session_token = ?, session_last_seen_at = ?
-            WHERE id = ?
-            """,
-            (new_tok, _utc_now_iso(), uid),
-        )
-    return uid, new_tok
-
-
-def clear_user_session(user_id: int) -> None:
-    with get_conn() as conn:
-        conn.execute(
-            """
-            UPDATE users SET session_token = NULL, session_last_seen_at = NULL
-            WHERE id = ?
-            """,
-            (user_id,),
-        )
-
-
-def user_client_session_valid(user_id: int, client_token: str | None) -> bool:
-    if not client_token or not str(client_token).strip():
-        return False
-    with get_conn() as conn:
-        row = conn.execute(
-            "SELECT session_token FROM users WHERE id = ?", (user_id,)
-        ).fetchone()
-    if row is None:
-        return False
-    db_tok = row["session_token"]
-    if db_tok is None or not str(db_tok).strip():
-        return False
-    return _session_tokens_equal(str(db_tok).strip(), str(client_token).strip())
-
-
-def touch_user_session(user_id: int) -> None:
-    with get_conn() as conn:
-        conn.execute(
-            "UPDATE users SET session_last_seen_at = ? WHERE id = ?",
-            (_utc_now_iso(), user_id),
-        )
 
 
 def verify_user(login_email: str, password: str) -> int | None:
@@ -905,10 +781,7 @@ def update_user_password(user_id: int, new_password: str) -> tuple[bool, str]:
     ph = bcrypt.hash(_bcrypt_secret(new_password))
     with get_conn() as conn:
         conn.execute(
-            """
-            UPDATE users SET password_hash = ?, session_token = NULL, session_last_seen_at = NULL
-            WHERE id = ?
-            """,
+            "UPDATE users SET password_hash = ? WHERE id = ?",
             (ph, user_id),
         )
     return True, "Password updated."

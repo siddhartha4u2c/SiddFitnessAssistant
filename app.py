@@ -47,8 +47,6 @@ if "user_id" not in st.session_state:
     st.session_state.user_id = None
 if "username" not in st.session_state:
     st.session_state.username = None
-if "auth_session_token" not in st.session_state:
-    st.session_state.auth_session_token = None
 if "last_meal_context" not in st.session_state:
     st.session_state.last_meal_context = ""
 
@@ -1922,22 +1920,6 @@ def profile_has_required_fields(p: dict) -> bool:
 uid = st.session_state.user_id
 active = uid is not None
 
-if active:
-    _uid_chk = int(uid)
-    _client_tok = st.session_state.get("auth_session_token")
-    if not db.user_client_session_valid(_uid_chk, _client_tok):
-        st.session_state.user_id = None
-        st.session_state.username = None
-        st.session_state.auth_session_token = None
-        st.session_state.last_meal_context = ""
-        st.session_state.meal_camera_open = False
-        st.session_state.pop("show_daily_calorie_results", None)
-        st.session_state["_session_invalid_notice"] = (
-            "Your session is no longer valid. Please sign in again."
-        )
-        st.rerun()
-    db.touch_user_session(_uid_chk)
-
 
 def _signed_in_theme_css() -> str:
     return """
@@ -3110,12 +3092,8 @@ if active:
             _render_daily_activity_logger(int(st.session_state.user_id))
     with head_r:
         if st.button("Log out", use_container_width=False, key="btn_logout"):
-            _lo = st.session_state.user_id
-            if _lo is not None:
-                db.clear_user_session(int(_lo))
             st.session_state.user_id = None
             st.session_state.username = None
-            st.session_state.auth_session_token = None
             st.session_state.last_meal_context = ""
             st.session_state.meal_camera_open = False
             st.session_state.pop("show_daily_calorie_results", None)
@@ -3127,13 +3105,10 @@ else:
 
     _flash_ok = st.session_state.pop("auth_flash_ok", None)
     _flash_err = st.session_state.pop("auth_flash_err", None)
-    _sess_inv = st.session_state.pop("_session_invalid_notice", None)
     if _flash_ok:
         st.success(_flash_ok)
     if _flash_err:
         st.error(_flash_err)
-    if _sess_inv:
-        st.warning(_sess_inv)
 
     hero_col, form_col = st.columns([1.22, 1], gap="large")
     with hero_col:
@@ -3170,19 +3145,12 @@ else:
                 if not db.is_valid_login_email(raw_e):
                     st.error("Enter a valid sign-in email address.")
                 else:
-                    found, tok_or_err = db.try_email_password_sign_in_reserve_session(raw_e, lp)
-                    if found is not None:
+                    found, why_fail = db.try_email_password_sign_in(raw_e, lp)
+                    if found:
                         st.session_state.user_id = found
                         st.session_state.username = db.get_username(found)
-                        st.session_state.auth_session_token = tok_or_err
                         st.rerun()
-                    elif tok_or_err == "session_active":
-                        st.error(
-                            "Already another session active. "
-                            "Sign out on the other device or browser, or wait a few minutes after "
-                            "closing the app there, then try again."
-                        )
-                    elif tok_or_err == "unverified":
+                    elif why_fail == "unverified":
                         st.error(
                             "Activate your account first—open the link we sent to your email "
                             "(valid 1 hour). After it expires you can register again with the same email."
