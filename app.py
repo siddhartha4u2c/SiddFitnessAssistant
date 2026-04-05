@@ -984,10 +984,9 @@ MEAL PLANS: When the user asks for a meal plan, eating plan, day or week of meal
 or what to eat to reach a fitness goal:
 - Use their **country / region** and **cuisine preferences** so dishes, ingredients, and meal patterns
   are familiar and realistically available (typical breakfast/lunch/dinner, staples, local options).
-- Align calories and macros with their **primary fitness goal** (e.g. fat loss: sustainable deficit,
-  protein and fiber for satiety; muscle gain: adequate protein and energy; maintenance: balance around
-  maintenance calories). If **ENERGY CONTEXT** below includes saved BMR/TDEE, treat those as rough
-  guides only and state assumptions; if missing, infer sensible ranges from goal and profile.
+- Align calories and macros with their **primary fitness goal**. When **ENERGY CONTEXT** includes BMR/TDEE: **fat loss** ≈ **200–300 kcal/day below**
+  maintenance (avoid very low intakes or large deficits); **muscle/weight gain** ≈ **200–300 kcal/day above** maintenance (avoid large surpluses unless the user asks);
+  **maintenance** near TDEE (about **±150–200 kcal**). Emphasize **protein** and, for fat loss, **fiber** for satiety. Treat numbers as rough guides and state assumptions; if TDEE is missing, infer sensible ranges from goal and profile.
 - Respect **diet pattern** strictly: if **Vegetarian**, no meat/fish/poultry—eggs/dairy allowed unless notes say otherwise; if the user says vegetarian **and eats eggs**, centre **lacto-ovo**-style proteins. Apply **Vegan** / **Pescatarian** / other pattern the same way. Use **coach notes** and **meal timing** text for nuances (e.g. eggs OK, no dairy).
 - Respect allergies, foods to avoid, health notes, and meal timing from the profile.
 - Structure the answer clearly (e.g. by day or by meal) with portion cues and approximate calories per
@@ -1072,7 +1071,7 @@ Use when the user cares about **losing weight**, **fat loss**, **getting lean**,
 **Practical pillars for fat loss (not just weight loss)**
 1. **Strength / resistance training** — helps **retain muscle** and supports long-term calorie burn and function; avoid “only cardio + crash diet” as the default story.
 2. **Higher protein** (contextual; often **~1.2–1.6+ g/kg/day** in deficits is discussed in evidence for retention—**adapt** to their weight, pattern, and preferences) — supports muscle and **satiety**.
-3. **Moderate calorie deficit** — **sustainable** fat loss; avoid glorifying extreme restriction; tie to **TDEE/profile** when you have it.
+3. **Moderate calorie deficit** — when TDEE is known, about **200–300 kcal/day below** maintenance (not a crash diet); tie to **TDEE/profile** when you have it.
 4. **Progress beyond the scale** — **photos**, **measurements**, **clothes fit**, **strength or performance**, and **trend** over weeks; **daily weight fluctuates** with water and salt.
 
 **Bottom line for coaching tone**
@@ -1754,32 +1753,61 @@ def build_week_plan_nutrition_block(
     else:
         lines.append(
             "TDEE could not be computed from the profile; infer reasonable daily calorie levels from body weight, "
-            "activity, and goal, and state briefly that figures are approximate."
+            "activity, and goal, and state briefly that figures are approximate. For **fat loss**, stay only **~200–300 kcal** "
+            "below estimated maintenance (not very low). For **muscle gain**, only **~200–300 kcal** above—avoid large surpluses."
         )
+
+    ref_tdee: float | None = log_tdee
+    if ref_tdee is None and tdee_prof is not None:
+        ref_tdee = float(tdee_prof)
 
     goal = (p.get("primary_goal") or "").strip()
     if goal == "Fat loss":
         lines.append(
-            "**Fat loss:** Each day's **Day total (food)** must be **clearly below** the maintenance/TDEE reference above "
-            "(typically about **300–500 kcal/day** under TDEE unless the user's week request specifies a different deficit). "
-            "Rest or light days can be slightly lower than heavy training days but still include adequate protein."
+            "**Fat loss:** Each day's **Day total (food)** must be **~200–300 kcal below** the maintenance/TDEE reference—"
+            "a **moderate** deficit only. **Do not** prescribe very low intakes or deficits **much larger than ~300 kcal** below TDEE "
+            "(no crash dieting). Heavier training days may use a **slightly smaller** deficit (nearer −200 kcal); lighter days may sit "
+            "nearer −300 kcal, but stay in band. **Adequate protein** every day."
         )
+        if ref_tdee is not None:
+            r = round(ref_tdee)
+            lo, hi = r - 300, r - 200
+            lines.append(
+                f"**Numeric band (use for every day):** **Day total** approximately **{lo}–{hi} kcal** "
+                f"(maintenance ~{r} minus 300 to minus 200). Do not center the week far below **~{lo} kcal**."
+            )
     elif goal == "Muscle gain":
         lines.append(
-            "**Muscle gain:** Daily food totals should be **at or modestly above** TDEE (often **~200–350 kcal** above), "
-            "with **high protein** every day; align carbs somewhat with harder training days."
+            "**Muscle gain:** Target **~200–300 kcal per day above** TDEE on average—a **modest** surplus, not a large bulk unless "
+            "the user's week request explicitly asks for more. **High protein** daily; align carbs somewhat with harder training days."
         )
+        if ref_tdee is not None:
+            r = round(ref_tdee)
+            lo, hi = r + 200, r + 300
+            lines.append(
+                f"**Numeric band:** **Day total** approximately **{lo}–{hi} kcal** (maintenance ~{r} plus 200 to 300). "
+                f"Avoid suggesting routine days **much above** ~{hi} kcal unless the user clearly wants a bigger surplus."
+            )
     elif goal == "Maintain weight":
         lines.append(
             "**Maintain weight:** Keep each day's food total **close to** TDEE (roughly within **±150–200 kcal**)."
         )
     elif goal in ("Athletic performance", "General health", "Other"):
         lines.append(
-            f"**{goal}:** Fuel training adequately; use TDEE as a rough anchor unless the user explicitly wants a cut or bulk."
+            f"**{goal}:** Use profile TDEE as the maintenance anchor. If the **week request** implies **fat loss**, keep days **~200–300 kcal** "
+            f"below TDEE only; if it implies **weight/muscle gain**, **~200–300 kcal** above—avoid extreme deficits or surpluses unless the user "
+            "explicitly asks otherwise."
         )
+        if ref_tdee is not None:
+            r = round(ref_tdee)
+            lines.append(
+                f"Reference maintenance ~**{r} kcal/day**; apply the ±200–300 kcal rule when the request implies cut or bulk."
+            )
     else:
         lines.append(
-            "**Primary goal not set:** Use balanced meals; if TDEE is known, keep days near maintenance unless the user request implies otherwise."
+            "**Primary goal not set:** Use balanced meals anchored on TDEE when known. If the week request implies **fat loss**, "
+            "use **~200–300 kcal below** maintenance per day (not lower). If it implies **gain**, **~200–300 kcal above**. "
+            "Otherwise stay near maintenance (about **±150–200 kcal**)."
         )
 
     _user_chat_lines: list[str] = []

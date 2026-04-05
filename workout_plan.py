@@ -284,7 +284,7 @@ Produce EXACTLY a **7-day** block. Each day MUST use this exact outer delimiter 
 - **Lunch:** Same style with **~XXX kcal**.
 - **Dinner:** Same style with **~XXX kcal**.
 - **Day total (food, approximate):** ~XXXX kcal — **one short line** (different wording every day; sound like a person, not a template).
-  Relate informally to TDEE / goal (e.g. fat loss: under maintenance) without repeating the same sentence structure across days.
+  Relate informally to TDEE / goal (e.g. fat loss: **~200–300 kcal under** maintenance—not a deep deficit) without repeating the same sentence structure across days.
 
 ---DAY 2---
 (same #### Training / #### Meals structure)
@@ -301,11 +301,10 @@ Rules (training):
 
 Rules (meals):
 - Every day must include **Breakfast, Lunch, Dinner** under #### Meals with approximate calories each and a **Day total** line.
-- Follow **NUTRITION / CALORIE RULES** above when choosing portion sizes and day totals; on **fat loss**, each day's food total must stay
-  **below** the stated maintenance/TDEE reference (sustainable deficit unless the user asked otherwise).
-- **Vary day-to-day calories naturally:** do **not** use the same **Day total** number every day. Let totals drift (e.g. ±80–220 kcal vs your
-  weekly average) based on training load, rest day, appetite-friendly swaps, and realism—while still meeting the goal (e.g. fat loss: every day
-  still below TDEE, but not identical totals or copy-pasted explanations).
+- Follow **NUTRITION / CALORIE RULES** above for portion sizes and **Day total** lines. **Fat loss / weight loss:** each day about **200–300 kcal below**
+  maintenance/TDEE (moderate deficit only—**not** very low calories). **Muscle or weight gain:** about **200–300 kcal above** maintenance—**not** a large surplus unless rules say otherwise.
+- **Vary day-to-day calories naturally** within that band: do **not** use the same **Day total** every day. Small drift (e.g. ±30–80 kcal vs the week's
+  average) is fine for training vs rest days—every day must still obey the **200–300 kcal** under/over rule from **NUTRITION / CALORIE RULES**.
 - **Vary the Day total sentence** each day: different verbs, length, and tone (sometimes one clause, sometimes two; never paste the same
   explanation seven times).
 - Align meals with **training vs rest** (e.g. slightly more carbs around harder training days when appropriate; still respect calorie rules).
