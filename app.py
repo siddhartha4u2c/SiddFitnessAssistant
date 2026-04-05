@@ -589,31 +589,41 @@ def _query_param_single(key: str) -> str | None:
 
 _verify_email_tok = _query_param_single("verify_email")
 if _verify_email_tok:
-    st.title("Activate your account")
     uid_verify = db.try_consume_email_verification_token(_verify_email_tok)
-    if uid_verify is None:
-        st.error(
-            "This activation link is invalid or has expired. After 1 hour you can use **Register** again "
-            "with the same email and password to receive a new link. If you already used this link, sign in."
+    try:
+        st.query_params.clear()
+    except Exception:
+        pass
+    if uid_verify is not None:
+        st.session_state.auth_flash_ok = (
+            "Your email is **verified**. Use **Sign in** on this page with the same email and password "
+            "you chose at registration."
         )
+        _em_v = db.get_username(uid_verify)
+        if _em_v:
+            st.session_state.login_user = _em_v
     else:
-        st.success("Your account is activated. You can sign in below.")
-        try:
-            st.query_params.clear()
-        except Exception:
-            pass
-    st.stop()
+        st.session_state.auth_flash_err = (
+            "This activation link is **invalid or has expired**. If it has been more than an hour, use "
+            "**Register** again with the same email and password to get a new link. If you already "
+            "verified your account, sign in below."
+        )
+    st.rerun()
 
 _reset_tok = _query_param_single("reset_token")
 if _reset_tok:
     st.title("Set a new password")
     uid_reset = db.verify_reset_token(_reset_tok)
     if uid_reset is None:
-        st.error(
-            "This reset link is invalid or has expired. Request a new one under "
-            "**Forgot password** on the sign-in page."
+        try:
+            st.query_params.clear()
+        except Exception:
+            pass
+        st.session_state.auth_flash_err = (
+            "This password reset link is **invalid or has expired**. Open **Sign in** → "
+            "**Email a reset link** to request a new one."
         )
-        st.stop()
+        st.rerun()
     un_reset = db.get_username(uid_reset)
     st.caption(f"Sign-in email: **{un_reset}**")
     with st.form("password_reset_complete_form"):
@@ -2788,6 +2798,13 @@ if active:
 else:
     _guest_auth_body_class_add()
     st.markdown(_guest_auth_theme_css(), unsafe_allow_html=True)
+
+    _flash_ok = st.session_state.pop("auth_flash_ok", None)
+    _flash_err = st.session_state.pop("auth_flash_err", None)
+    if _flash_ok:
+        st.success(_flash_ok)
+    if _flash_err:
+        st.error(_flash_err)
 
     hero_col, form_col = st.columns([1.22, 1], gap="large")
     with hero_col:

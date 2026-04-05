@@ -231,24 +231,34 @@ This message was sent from an automated address. Do not reply.
 
 
 def send_email_verification_email(to_address: str, verify_url: str) -> None:
-    subject = "Activate your account — SID Fitness Assistant"
+    subject = "Confirm your email — SID Fitness Assistant"
     body = f"""Hello,
 
-Thanks for registering with the SID Fitness Assistant app.
+Thank you for creating an account with SID Fitness Assistant.
 
-Open this link in your browser to activate your account (valid for 1 hour):
+To finish setup, open the secure link below in your browser (one time only). It expires in 1 hour:
 
 {verify_url}
 
-If you did not create an account, you can ignore this email.
+After you confirm, you will return to the app’s sign-in page to log in with your email and password.
+
+If you did not register, you can ignore this message.
 
 —
-This message was sent from an automated address. Do not reply.
+SID Fitness Assistant · Automated message · Do not reply
 """
     href = html_module.escape(verify_url, quote=True)
     body_html = (
-        "<p>Hello,</p><p>Thanks for registering with the SID Fitness Assistant app.</p>"
-        f'<p><a href="{href}">Activate your account</a> (valid for 1 hour).</p>'
-        "<p>If you did not create an account, you can ignore this email.</p>"
+        "<p>Hello,</p>"
+        "<p>Thank you for creating an account with <strong>SID Fitness Assistant</strong>.</p>"
+        "<p>To finish setup, use the button below. The link is valid for <strong>1 hour</strong> and "
+        "opens the app so you can sign in.</p>"
+        f'<p style="margin:24px 0;"><a href="{href}" style="display:inline-block;padding:12px 20px;'
+        "background-color:#1d4ed8;color:#ffffff;text-decoration:none;border-radius:8px;"
+        'font-weight:600;">Confirm email &amp; continue</a></p>'
+        "<p style=\"font-size:14px;color:#444;\">Or copy and paste this address into your browser:<br/>"
+        f'<span style="word-break:break-all;">{href}</span></p>'
+        "<p style=\"font-size:14px;color:#444;\">If you did not register, you can ignore this email.</p>"
+        "<p style=\"font-size:12px;color:#888;\">SID Fitness Assistant · Automated message · Do not reply</p>"
     )
     _send_transactional(to_address, subject, body, body_html=body_html)
