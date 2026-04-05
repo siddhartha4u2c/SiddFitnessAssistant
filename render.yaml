@@ -2,7 +2,7 @@
 # Build/start assume the repo root is this folder (where app.py and requirements.txt live).
 #
 # Render Free blocks outbound SMTP. Set in the dashboard: RESEND_API_KEY, RESEND_FROM_EMAIL,
-# PASSWORD_RESET_APP_URL (your https://….onrender.com URL), plus LLM keys. See .env.example.
+# PASSWORD_RESET_APP_URL (public https URL: custom domain or …onrender.com), plus LLM keys.
 services:
   - type: web
     name: sidd-fitness-assistant

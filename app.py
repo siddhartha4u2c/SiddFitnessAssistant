@@ -29,9 +29,9 @@ def _warn_if_render_app_url_is_localhost() -> None:
     if os.getenv("RENDER", "").lower() == "true" and "localhost" in base.lower():
         st.warning(
             "Production check: **PASSWORD_RESET_APP_URL** still points at localhost. "
-            "In your Render service **Environment**, set it to your live URL, e.g. "
-            "`https://your-service.onrender.com` (no trailing slash), so activation and "
-            "reset links in emails work."
+            "In your host’s **Environment** (e.g. Render), set it to your **public** site URL "
+            "(custom domain or default host), e.g. `https://app.example.com` (no trailing slash), "
+            "so activation and reset links in emails work."
         )
 
 
@@ -2525,35 +2525,51 @@ def render_main_content() -> None:
         show_coach_history = st.checkbox(
             "Show coach chat (previous messages only)",
             key="toggle_coach_chat",
-            help="Past messages appear above when enabled. The chat box below is always available; each reply still uses your latest profile and logs.",
+            help=(
+                "Turn on to see **older** exchanges above. Your **latest** question and coach reply "
+                "stay visible just above the input without enabling this."
+            ),
         )
-        if show_coach_history:
-            _coach_av = _coach_chat_avatar_path()
-            if "coach_visible_msg_count" not in st.session_state:
-                st.session_state.coach_visible_msg_count = 5
 
-            _coach_msg_total = db.count_chat_messages(uid)
-            if _coach_msg_total > 0:
-                _vis = min(int(st.session_state.coach_visible_msg_count), _coach_msg_total)
-                _older_hidden = _coach_msg_total - _vis
-                if _older_hidden > 0:
-                    if st.button(
-                        f"Show 5 more previous chats ({_older_hidden} older hidden)",
-                        key="btn_coach_load_more_history",
-                    ):
-                        st.session_state.coach_visible_msg_count = _vis + 5
-                        st.rerun()
-                msgs = db.list_chat_messages(uid, limit=_vis)
-            else:
-                msgs = []
+        _coach_av = _coach_chat_avatar_path()
+        if "coach_visible_msg_count" not in st.session_state:
+            st.session_state.coach_visible_msg_count = 5
 
-            for m in msgs:
+        _coach_msg_total = db.count_chat_messages(uid)
+        msgs: list = []
+        if _coach_msg_total > 0:
+            _vis = min(int(st.session_state.coach_visible_msg_count), _coach_msg_total)
+            msgs = db.list_chat_messages(uid, limit=_vis)
+
+        # Always show the newest turn (last user + coach messages); older rows are "archive" behind the checkbox.
+        tail = msgs[-2:] if len(msgs) >= 2 else msgs
+        head = msgs[:-2] if len(msgs) > 2 else []
+
+        if show_coach_history and _coach_msg_total > 0:
+            _loaded = len(msgs)
+            _older_hidden = _coach_msg_total - _loaded
+            if _older_hidden > 0:
+                if st.button(
+                    f"Show 5 more previous chats ({_older_hidden} older hidden)",
+                    key="btn_coach_load_more_history",
+                ):
+                    st.session_state.coach_visible_msg_count = _loaded + 5
+                    st.rerun()
+            for m in head:
                 is_u = m["role"] == "user"
                 _kw: dict = {}
                 if not is_u and _coach_av:
                     _kw["avatar"] = _coach_av
                 with st.chat_message("user" if is_u else "assistant", **_kw):
                     st.write(m["content"])
+
+        for m in tail:
+            is_u = m["role"] == "user"
+            _kw: dict = {}
+            if not is_u and _coach_av:
+                _kw["avatar"] = _coach_av
+            with st.chat_message("user" if is_u else "assistant", **_kw):
+                st.write(m["content"])
 
         if coach_q := st.chat_input("Ask the coach…"):
             img_bytes: bytes | None = None
@@ -2844,7 +2860,9 @@ else:
                         if uid_f and email_f:
                             try:
                                 token_f = db.create_password_reset_token(uid_f)
-                                link_f = f"{base_url}?reset_token={token_f}"
+                                link_f = mailer.build_transactional_link(
+                                    base_url, reset_token=token_f
+                                )
                                 mailer.send_password_reset_email(
                                     email_f,
                                     link_f,
@@ -2906,7 +2924,9 @@ else:
                             base_r = _public_app_base_url()
                             try:
                                 vtok_r = db.create_email_verification_token(uid_r)
-                                vlink_r = f"{base_r}?verify_email={vtok_r}"
+                                vlink_r = mailer.build_transactional_link(
+                                    base_r, verify_email=vtok_r
+                                )
                                 prof = db.get_profile(uid_r)
                                 to_addr = (prof.get("email") or "").strip() or db.normalize_login_email(
                                     ra_em
@@ -2954,7 +2974,9 @@ else:
                                 send_err: str | None = None
                                 try:
                                     vtok = db.create_email_verification_token(uid_new)
-                                    vlink = f"{base_reg}?verify_email={vtok}"
+                                    vlink = mailer.build_transactional_link(
+                                        base_reg, verify_email=vtok
+                                    )
                                     mailer.send_email_verification_email(
                                         db.normalize_login_email(em), vlink
                                     )

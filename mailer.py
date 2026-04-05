@@ -6,6 +6,7 @@ SMTP; on Render Free set **RESEND_API_KEY** + **RESEND_FROM_EMAIL** instead (HTT
 
 from __future__ import annotations
 
+import html as html_module
 import json
 import logging
 import os
@@ -15,8 +16,19 @@ import urllib.error
 import urllib.request
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from urllib.parse import urlencode
 
 _logger = logging.getLogger(__name__)
+
+
+def build_transactional_link(base_url: str, **query: str) -> str:
+    """Build ``https://host/?key=value`` with correct encoding (safe for email clients)."""
+    root = (base_url or "").strip().rstrip("/")
+    if not root:
+        root = "http://localhost:8501"
+    q = urlencode(query)
+    # Explicit "/" before "?" avoids rare 404s where proxies treat host?query as a non-root path.
+    return f"{root}/?{q}"
 
 
 def _smtp_password() -> str:
@@ -45,20 +57,47 @@ def transactional_email_configured() -> bool:
     return resend_configured() or smtp_configured()
 
 
-def _send_via_resend(to_address: str, subject: str, body: str) -> None:
+def _format_resend_api_error(http_code: int, body: str) -> str:
+    """Turn Resend JSON errors into clearer messages for the UI."""
+    raw = (body or "").strip()
+    if http_code == 403 and raw.startswith("{"):
+        try:
+            data = json.loads(raw)
+            msg = (data.get("message") or raw).strip()
+            if "only send testing emails to your own" in msg.lower():
+                return (
+                    f"{msg} "
+                    "Fix: add and verify your domain at https://resend.com/domains , then set "
+                    "**RESEND_FROM_EMAIL** to an address on that domain (e.g. noreply@yourdomain.com). "
+                    "Until then, Resend only delivers test mail to the email tied to your Resend account."
+                )
+            return f"Resend API HTTP {http_code}: {msg}"
+        except json.JSONDecodeError:
+            pass
+    return f"Resend API HTTP {http_code}: {raw}"
+
+
+def _send_via_resend(
+    to_address: str,
+    subject: str,
+    body_plain: str,
+    *,
+    body_html: str | None = None,
+) -> None:
     key = (os.getenv("RESEND_API_KEY") or "").strip()
     from_addr = (os.getenv("RESEND_FROM_EMAIL") or "").strip()
     if not key or not from_addr:
         raise RuntimeError("RESEND_API_KEY and RESEND_FROM_EMAIL must be set.")
 
-    payload = json.dumps(
-        {
-            "from": from_addr,
-            "to": [to_address],
-            "subject": subject,
-            "text": body,
-        }
-    ).encode("utf-8")
+    payload_obj: dict = {
+        "from": from_addr,
+        "to": [to_address],
+        "subject": subject,
+        "text": body_plain,
+    }
+    if body_html:
+        payload_obj["html"] = body_html
+    payload = json.dumps(payload_obj).encode("utf-8")
     req = urllib.request.Request(
         "https://api.resend.com/emails",
         data=payload,
@@ -75,18 +114,30 @@ def _send_via_resend(to_address: str, subject: str, body: str) -> None:
             resp.read()
     except urllib.error.HTTPError as e:
         detail = e.read().decode(errors="replace") if e.fp else str(e)
-        raise RuntimeError(f"Resend API HTTP {e.code}: {detail}") from e
+        raise RuntimeError(_format_resend_api_error(e.code, detail)) from e
     _logger.info("Resend send OK to=%s subject=%r", to_address, subject)
 
 
-def _send_transactional(to_address: str, subject: str, body: str) -> None:
+def _send_transactional(
+    to_address: str,
+    subject: str,
+    body_plain: str,
+    *,
+    body_html: str | None = None,
+) -> None:
     if resend_configured():
-        _send_via_resend(to_address, subject, body)
+        _send_via_resend(to_address, subject, body_plain, body_html=body_html)
     else:
-        _send_smtp_plain(to_address, subject, body)
+        _send_smtp_plain(to_address, subject, body_plain, body_html=body_html)
 
 
-def _send_smtp_plain(to_address: str, subject: str, body: str) -> None:
+def _send_smtp_plain(
+    to_address: str,
+    subject: str,
+    body: str,
+    *,
+    body_html: str | None = None,
+) -> None:
     to_address = (to_address or "").strip()
     if not to_address:
         raise RuntimeError("No recipient address for email.")
@@ -106,11 +157,13 @@ def _send_smtp_plain(to_address: str, subject: str, body: str) -> None:
             f"For Gmail set SMTP_SERVER=smtp.gmail.com (note the **.com**) in your .env file."
         )
 
-    msg = MIMEMultipart()
+    msg = MIMEMultipart("alternative") if body_html else MIMEMultipart()
     msg["Subject"] = subject
     msg["From"] = sender
     msg["To"] = to_address
     msg.attach(MIMEText(body, "plain", "utf-8"))
+    if body_html:
+        msg.attach(MIMEText(body_html, "html", "utf-8"))
 
     _dns_err = (
         f"Cannot reach mail server {server!r}: your system could not resolve that hostname "
@@ -163,7 +216,18 @@ If you did not request this, you can ignore this email. Your password will not c
 —
 This message was sent from an automated address. Do not reply.
 """
-    _send_smtp_plain(to_address, subject, body)
+    href = html_module.escape(reset_url, quote=True)
+    name_html = (
+        f" for account ({html_module.escape(username_hint)})"
+        if username_hint
+        else ""
+    )
+    body_html = (
+        f"<p>Hello,</p><p>You requested a password reset{name_html} for the SID Fitness Assistant app.</p>"
+        f'<p><a href="{href}">Set a new password</a> (valid for 1 hour).</p>'
+        f"<p>If you did not request this, you can ignore this email.</p>"
+    )
+    _send_transactional(to_address, subject, body, body_html=body_html)
 
 
 def send_email_verification_email(to_address: str, verify_url: str) -> None:
@@ -181,4 +245,10 @@ If you did not create an account, you can ignore this email.
 —
 This message was sent from an automated address. Do not reply.
 """
-    _send_transactional(to_address, subject, body)
+    href = html_module.escape(verify_url, quote=True)
+    body_html = (
+        "<p>Hello,</p><p>Thanks for registering with the SID Fitness Assistant app.</p>"
+        f'<p><a href="{href}">Activate your account</a> (valid for 1 hour).</p>'
+        "<p>If you did not create an account, you can ignore this email.</p>"
+    )
+    _send_transactional(to_address, subject, body, body_html=body_html)
