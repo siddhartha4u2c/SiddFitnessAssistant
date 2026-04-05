@@ -622,11 +622,16 @@ if _reset_tok:
             pass
         st.session_state.auth_flash_err = (
             "This password reset link is **invalid or has expired**. Open **Sign in** → "
-            "**Email a reset link** to request a new one."
+            "**Send a password reset link** to request a new one."
         )
         st.rerun()
     un_reset = db.get_username(uid_reset)
     st.caption(f"Sign-in email: **{un_reset}**")
+    st.caption(
+        "Choose a new password (at least 6 characters). For **this account only**, it must be "
+        "**different from your current password** and **not match any of the last 3 passwords "
+        "previously used on this account** (other users are unaffected)."
+    )
     with st.form("password_reset_complete_form"):
         rp1 = st.text_input("New password", type="password")
         rp2 = st.text_input("Confirm new password", type="password")
@@ -3192,11 +3197,8 @@ else:
                     else:
                         st.error("Invalid email or password.")
 
-            with st.expander("Email a reset link", expanded=False):
-                st.caption(
-                    "Enter the **email you use to sign in**, or the **email saved on your profile**. "
-                    "Password reset works by email only—the link is sent to that address."
-                )
+            with st.expander("Send a password reset link", expanded=False):
+                st.caption("Enter the email you use to sign in")
                 base_url = _public_app_base_url()
                 if st.button("Send reset link", use_container_width=False, key="btn_forgot_send"):
                     fid = (lu or "").strip()

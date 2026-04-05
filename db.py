@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import secrets
 import sqlite3
@@ -143,6 +144,7 @@ def init_db() -> None:
         _ensure_profile_columns(conn)
         _ensure_user_columns(conn)
         _ensure_email_verified_column(conn)
+        _ensure_password_history_column(conn)
         _ensure_goal_tracking_table(conn)
         _ensure_daily_activities_table(conn)
         _ensure_email_verification_tokens_table(conn)
@@ -190,6 +192,48 @@ def _ensure_email_verified_column(conn: sqlite3.Connection) -> None:
         conn.execute(
             "UPDATE users SET email_verified_at = created_at WHERE email_verified_at IS NULL"
         )
+
+
+def _ensure_password_history_column(conn: sqlite3.Connection) -> None:
+    """Per-user column on ``users``: each account has its own rolling history."""
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "password_history_json" not in cols:
+        conn.execute(
+            "ALTER TABLE users ADD COLUMN password_history_json TEXT DEFAULT '[]'"
+        )
+        conn.execute(
+            "UPDATE users SET password_history_json = '[]' "
+            "WHERE password_history_json IS NULL OR trim(password_history_json) = ''"
+        )
+
+
+def _load_password_history_json(raw: str | None) -> list[str]:
+    if not raw or not str(raw).strip():
+        return []
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(data, list):
+        return []
+    out: list[str] = []
+    for x in data:
+        if isinstance(x, str) and x.strip():
+            out.append(x.strip())
+        if len(out) >= 3:
+            break
+    return out[:3]
+
+
+def _dump_password_history_json(hashes: list[str]) -> str:
+    return json.dumps(hashes[:3], separators=(",", ":"))
+
+
+def _password_matches_hash(plain_secret: str, stored_hash: str) -> bool:
+    try:
+        return bool(bcrypt.verify(plain_secret, stored_hash))
+    except (ValueError, TypeError):
+        return False
 
 
 def _ensure_daily_activities_table(conn: sqlite3.Connection) -> None:
@@ -776,13 +820,44 @@ def try_consume_email_verification_token(token_plain: str) -> int | None:
 
 
 def update_user_password(user_id: int, new_password: str) -> tuple[bool, str]:
+    """Set a new password for this user only.
+
+    Rejects reuse of that account's current password or its last 3 previous passwords
+    (history is stored per ``user_id``, not shared across users).
+    """
     if len(new_password) < 6:
         return False, "Password must be at least 6 characters."
-    ph = bcrypt.hash(_bcrypt_secret(new_password))
+    sec = _bcrypt_secret(new_password)
+    ph = bcrypt.hash(sec)
     with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT password_hash, password_history_json FROM users WHERE id = ?
+            """,
+            (user_id,),
+        ).fetchone()
+        if not row:
+            return False, "Account not found."
+        current_hash = row["password_hash"]
+        _hr = row["password_history_json"]
+        hist = _load_password_history_json(str(_hr) if _hr is not None else "[]")
+
+        if _password_matches_hash(sec, current_hash):
+            return False, "New password must be different from this account's current password."
+        for old_h in hist:
+            if _password_matches_hash(sec, old_h):
+                return (
+                    False,
+                    "This password matches one of this account's last 3 previous passwords. "
+                    "Choose a different password.",
+                )
+
+        new_hist = [current_hash] + hist[:2]
         conn.execute(
-            "UPDATE users SET password_hash = ? WHERE id = ?",
-            (ph, user_id),
+            """
+            UPDATE users SET password_hash = ?, password_history_json = ? WHERE id = ?
+            """,
+            (ph, _dump_password_history_json(new_hist), user_id),
         )
     return True, "Password updated."
 
