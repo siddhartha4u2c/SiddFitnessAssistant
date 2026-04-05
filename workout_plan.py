@@ -710,18 +710,36 @@ def _generate_routed_image(
     return None, err
 
 
-def build_coach_illustration_prompt(user_subject: str) -> str:
-    """Single educational exercise or food illustration; anonymous / no celebrity faces."""
+def build_coach_illustration_prompt(
+    user_subject: str, *, has_reference_face: bool = False
+) -> str:
+    """Educational exercise or food illustration; optional user portrait for same-person renders."""
     subj = (user_subject or "").strip()[:900]
-    return (
-        "Create one clear educational illustration for a fitness and nutrition coaching app.\n"
-        f"User request (focus on this subject only): {subj}\n\n"
-        "If the subject is an exercise or movement: show correct positioning in a clean gym or neutral "
-        "studio; anonymous person, side or back view preferred; no identifiable faces.\n"
-        "If the subject is food: appetizing realistic plated dish or sensible arrangement; respect "
-        "vegetarian/vegan cues from the wording if any.\n"
-        "No text overlays, watermarks, or readable brand logos. Photorealistic or high-quality render."
-    )
+    lines = [
+        "Create one clear educational illustration for a fitness and nutrition coaching app.",
+        f"User request (focus on this subject only): {subj}",
+        "",
+    ]
+    if has_reference_face:
+        lines.append(
+            "A **reference portrait** of the user is attached: keep the **same recognizable face**, age, "
+            "skin tone, and plausible body build. **Exercise requests:** that same person demonstrating "
+            "correct form in a gym or studio. **Food / meal requests:** that same person at a table or "
+            "counter with an appetizing **plated, bowl, or thali-style** presentation of the described dish, "
+            "or a clear **hero shot** of the food alone if that fits the wording better. "
+            "Respect vegetarian/vegan cues from the user text. Photorealistic."
+        )
+    else:
+        lines.append(
+            "If exercise/movement: correct form in a clean gym or neutral studio; anonymous person, "
+            "side or back view preferred; no identifiable faces."
+        )
+        lines.append(
+            "If food or drink: appetizing **photo-style** image—plated meal, bowl, glass, or spread; "
+            "respect vegetarian/vegan cues in the wording if any."
+        )
+    lines.append("No text overlays, watermarks, or readable brand logos.")
+    return "\n".join(lines)
 
 
 def generate_coach_educational_image(
@@ -741,7 +759,10 @@ def generate_coach_educational_image(
     if not prim:
         return None, None
     model_id = default_image_model()
-    prompt = build_coach_illustration_prompt(user_question)
+    prompt = build_coach_illustration_prompt(
+        user_question,
+        has_reference_face=bool(reference_image_bytes),
+    )
     euri_sz = os.getenv("COACH_ILLUSTRATION_EURI_SIZE", "1024x1024").strip() or "1024x1024"
     return _generate_routed_image(
         prompt,

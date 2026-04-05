@@ -2,6 +2,7 @@ import html
 import io
 import logging
 import os
+import re
 from datetime import date
 from pathlib import Path
 
@@ -46,6 +47,8 @@ if "user_id" not in st.session_state:
     st.session_state.user_id = None
 if "username" not in st.session_state:
     st.session_state.username = None
+if "auth_session_token" not in st.session_state:
+    st.session_state.auth_session_token = None
 if "last_meal_context" not in st.session_state:
     st.session_state.last_meal_context = ""
 
@@ -683,15 +686,207 @@ Recommendation:
 """
 
 
+_COACH_ILLUSTRATION_EXERCISE_TERMS = (
+    "exercise",
+    "workout",
+    "movement",
+    "gym",
+    "squat",
+    "deadlift",
+    "lunge",
+    "push-up",
+    "pushup",
+    "push up",
+    "pull-up",
+    "pullup",
+    "pull up",
+    "sit-up",
+    "sit up",
+    "chin up",
+    "chin-up",
+    "plank",
+    "burpee",
+    "yoga",
+    "stretch",
+    "lift",
+    "row",
+    "press",
+    "curl",
+    "fly",
+    "crunch",
+    "clean",
+    "snatch",
+    "warmup",
+    "cooldown",
+    "mountain climber",
+    "jumping jack",
+    "leg raise",
+    "calf raise",
+    "hip hinge",
+    "bench press",
+    "lat pulldown",
+    "tricep",
+    "bicep",
+    "cardio",
+    "kettlebell",
+    "dumbbell",
+    "barbell",
+)
+
+# Foods, dishes, ingredients—photo/diagram requests for any of these trigger image generation.
+_COACH_ILLUSTRATION_FOOD_TERMS = (
+    "food",
+    "meal",
+    "dish",
+    "eat",
+    "eating",
+    "recipe",
+    "breakfast",
+    "brunch",
+    "lunch",
+    "dinner",
+    "snack",
+    "fruit",
+    "vegetable",
+    "veggie",
+    "greens",
+    "protein",
+    "carbs",
+    "plate",
+    "bowl",
+    "platter",
+    "serving",
+    "portion",
+    "curry",
+    "roti",
+    "chapati",
+    "paratha",
+    "naan",
+    "rice",
+    "biryani",
+    "pulao",
+    "khichdi",
+    "dal",
+    "daal",
+    "dahl",
+    "sambar",
+    "rasam",
+    "idli",
+    "dosa",
+    "uttapam",
+    "vada",
+    "upma",
+    "poha",
+    "dhokla",
+    "chole",
+    "chhole",
+    "bhature",
+    "paneer",
+    "tikka",
+    "kebab",
+    "butter chicken",
+    "palak",
+    "saag",
+    "rajma",
+    "choley",
+    "pav bhaji",
+    "misal",
+    "thali",
+    "lassi",
+    "chai",
+    "smoothie",
+    "juice",
+    "salad",
+    "soup",
+    "stew",
+    "sandwich",
+    "wrap",
+    "burger",
+    "pizza",
+    "pasta",
+    "noodles",
+    "ramen",
+    "sushi",
+    "taco",
+    "burrito",
+    "quesadilla",
+    "oatmeal",
+    "oats",
+    "cereal",
+    "granola",
+    "yogurt",
+    "yoghurt",
+    "dahi",
+    "egg",
+    "eggs",
+    "tofu",
+    "tempeh",
+    "fish",
+    "chicken",
+    "turkey",
+    "shrimp",
+    "prawn",
+    "salmon",
+    "tuna",
+    "steak",
+    "pork",
+    "lamb",
+    "sweet potato",
+    "potato",
+    "quinoa",
+    "avocado",
+    "berries",
+    "banana",
+    "apple",
+    "mango",
+    "watermelon",
+    "melon",
+    "nuts",
+    "almond",
+    "walnut",
+    "peanut",
+    "hummus",
+    "cheese",
+    "cottage cheese",
+    "ingredient",
+    "cuisine",
+    "dessert",
+    "cake",
+    "cookie",
+    "ice cream",
+    "chocolate",
+)
+
+
+def _coach_compact_matches_terms(t_compact: str, terms: tuple[str, ...]) -> bool:
+    """Match multi-word phrases as substrings; single words use boundaries (avoids ``press`` in espresso)."""
+    multi = sorted((x for x in terms if " " in x.strip()), key=len, reverse=True)
+    singles = [x for x in terms if " " not in x.strip()]
+    for m in multi:
+        if m in t_compact:
+            return True
+    for s in singles:
+        if re.search(rf"(?<![a-z0-9]){re.escape(s)}(?![a-z0-9])", t_compact):
+            return True
+    return False
+
+
 def _coach_user_wants_illustration(question: str) -> bool:
-    """True when the user is asking for a visual of a concrete exercise or food (triggers image generation)."""
+    """True when the user asks for a visual of exercise or food (triggers image generation)."""
     t = (question or "").strip().lower()
-    if len(t) < 10:
+    if len(t) < 8:
         return False
+    t_norm = t.replace("-", " ")
+    t_compact = " ".join(t_norm.split())
+
     visual = any(
         x in t
         for x in (
             "show me",
+            "show a",
+            "give me",
+            "give a",
+            "send me",
             "picture",
             "image",
             "photo",
@@ -720,63 +915,38 @@ def _coach_user_wants_illustration(question: str) -> bool:
             "example of",
         )
     )
-    domain = any(
-        w in t
-        for w in (
-            "exercise",
-            "workout",
-            "movement",
-            "gym",
-            "squat",
-            "deadlift",
-            "lunge",
-            "push-up",
-            "pushup",
-            "pull-up",
-            "pullup",
-            "plank",
-            "yoga",
-            "stretch",
-            "lift",
-            "row",
-            "press",
-            "curl",
-            "fly",
-            "crunch",
-            "clean",
-            "snatch",
-            "warmup",
-            "cooldown",
-            "food",
-            "meal",
-            "dish",
-            "eat",
-            "recipe",
-            "breakfast",
-            "lunch",
-            "dinner",
-            "snack",
-            "fruit",
-            "vegetable",
-            "protein",
-            "plate",
-            "bowl",
-            "curry",
-            "roti",
-            "rice",
-            "dal",
-            "smoothie",
-            "salad",
-            "oats",
-            "paneer",
+    exercise_hit = _coach_compact_matches_terms(t_compact, _COACH_ILLUSTRATION_EXERCISE_TERMS)
+    food_hit = _coach_compact_matches_terms(t_compact, _COACH_ILLUSTRATION_FOOD_TERMS)
+    # Named dish or ingredient often appears after "picture/photo of …"
+    generic_meal_context = any(
+        x in t_compact
+        for x in (
+            "something to eat",
+            "healthy meal",
+            "post workout meal",
+            "pre workout meal",
+            "grocery",
+            "grocery list",
+            "macro",
+            "calories",
+            "kcal",
         )
     )
+    domain = exercise_hit or food_hit or (visual and generic_meal_context)
     return domain and (visual or form_demo)
 
 
 def _coach_chat_avatar_path() -> str | None:
     """PNG next to coach replies in chat (``assets/coach_ai_avatar.png``)."""
     p = Path(__file__).resolve().parent / "assets" / "coach_ai_avatar.png"
+    return str(p) if p.is_file() else None
+
+
+def _user_profile_avatar_path(user_id: int) -> str | None:
+    """Profile photo path for user chat bubbles when a picture is saved."""
+    if not db.has_profile_image(user_id):
+        return None
+    p = db.profile_image_path(user_id)
     return str(p) if p.is_file() else None
 
 
@@ -839,7 +1009,7 @@ GOAL TIMELINE & PROGRESS: A **GOAL TIMELINE** section lists dated moments when t
 If information is missing, say what would help. Reference weight trends only when the log supports it.
 Keep replies readable; use more detail when the user requests full-day or multi-day plans.
 
-ILLUSTRATIONS: When the user clearly asks to **see** a specific **exercise** (form, technique, how to do it) or a **food/dish** (what it looks like, plated), answer in text as usual. The app may add a generated image on the same screen—your text should still stand alone (describe key cues) so the reply is useful even without the image."""
+ILLUSTRATIONS: When the user asks for a **picture**, **photo**, **image**, or **diagram** of an **exercise**, **movement**, **food**, **meal**, **dish**, or **ingredient**, give a **short** helpful text answer (form cues or what the food is). **Do not** say you cannot show images—the app may add an illustration for both **training visuals** and **food/plate** visuals. Keep text concise so it pairs well with an image."""
 
 # Evidence-informed defaults for muscle hypertrophy (use when goal/training/protein questions fit; still personalize to profile, diet pattern, allergies, and energy context).
 COACH_MUSCLE_GAIN_REFERENCE = """
@@ -1229,10 +1399,13 @@ def _render_daily_activity_logger(user_id: int) -> None:
         }[x],
         key="sid_activity_log_kind",
     )
+    if "sid_activity_notes_rev" not in st.session_state:
+        st.session_state.sid_activity_notes_rev = 0
+    _notes_rev = int(st.session_state.sid_activity_notes_rev)
     notes = st.text_area(
         "What did you do or eat?",
         placeholder="e.g. 40 min strength; or oats, fruit, coffee for breakfast",
-        key="sid_activity_log_notes",
+        key=f"sid_activity_log_notes_{_notes_rev}",
         height=90,
     )
     if st.button("Save entry", key="sid_btn_save_activity", type="primary"):
@@ -1242,9 +1415,8 @@ def _render_daily_activity_logger(user_id: int) -> None:
         else:
             db.add_daily_activity(user_id, picked.isoformat(), kind, t)
             st.success("Saved.")
-            # Drop widget state so reopening the popover shows empty fields (not the last saved text).
+            st.session_state.sid_activity_notes_rev = _notes_rev + 1
             for _k in (
-                "sid_activity_log_notes",
                 "sid_activity_log_date",
                 "sid_activity_log_kind",
             ):
@@ -1749,6 +1921,22 @@ def profile_has_required_fields(p: dict) -> bool:
 
 uid = st.session_state.user_id
 active = uid is not None
+
+if active:
+    _uid_chk = int(uid)
+    _client_tok = st.session_state.get("auth_session_token")
+    if not db.user_client_session_valid(_uid_chk, _client_tok):
+        st.session_state.user_id = None
+        st.session_state.username = None
+        st.session_state.auth_session_token = None
+        st.session_state.last_meal_context = ""
+        st.session_state.meal_camera_open = False
+        st.session_state.pop("show_daily_calorie_results", None)
+        st.session_state["_session_invalid_notice"] = (
+            "Your session is no longer valid. Please sign in again."
+        )
+        st.rerun()
+    db.touch_user_session(_uid_chk)
 
 
 def _signed_in_theme_css() -> str:
@@ -2629,6 +2817,17 @@ def render_main_content() -> None:
         )
 
         _coach_av = _coach_chat_avatar_path()
+        _user_av = _user_profile_avatar_path(uid)
+
+        def _coach_chat_avatar_kwargs(is_user: bool) -> dict:
+            d: dict = {}
+            if is_user:
+                if _user_av:
+                    d["avatar"] = _user_av
+            elif _coach_av:
+                d["avatar"] = _coach_av
+            return d
+
         if "coach_visible_msg_count" not in st.session_state:
             st.session_state.coach_visible_msg_count = 5
 
@@ -2654,18 +2853,18 @@ def render_main_content() -> None:
                     st.rerun()
             for m in head:
                 is_u = m["role"] == "user"
-                _kw: dict = {}
-                if not is_u and _coach_av:
-                    _kw["avatar"] = _coach_av
-                with st.chat_message("user" if is_u else "assistant", **_kw):
+                with st.chat_message(
+                    "user" if is_u else "assistant",
+                    **_coach_chat_avatar_kwargs(is_u),
+                ):
                     st.write(m["content"])
 
         for m in tail:
             is_u = m["role"] == "user"
-            _kw: dict = {}
-            if not is_u and _coach_av:
-                _kw["avatar"] = _coach_av
-            with st.chat_message("user" if is_u else "assistant", **_kw):
+            with st.chat_message(
+                "user" if is_u else "assistant",
+                **_coach_chat_avatar_kwargs(is_u),
+            ):
                 st.write(m["content"])
 
         _coach_ill = st.session_state.pop("coach_pending_illustration", None)
@@ -2719,6 +2918,12 @@ def render_main_content() -> None:
                         if prog_up is not None and attach_photo_to_next:
                             ref_ill = prog_up.getvalue()
                             ill_mime = _coach_image_mime(getattr(prog_up, "type", None))
+                        elif db.has_profile_image(uid):
+                            try:
+                                ref_ill = db.profile_image_path(uid).read_bytes()
+                                ill_mime = "image/jpeg"
+                            except OSError:
+                                ref_ill = None
                         with st.spinner("Creating an illustration…"):
                             img_b, _ill_err = workout_plan.generate_coach_educational_image(
                                 coach_q,
@@ -2905,8 +3110,12 @@ if active:
             _render_daily_activity_logger(int(st.session_state.user_id))
     with head_r:
         if st.button("Log out", use_container_width=False, key="btn_logout"):
+            _lo = st.session_state.user_id
+            if _lo is not None:
+                db.clear_user_session(int(_lo))
             st.session_state.user_id = None
             st.session_state.username = None
+            st.session_state.auth_session_token = None
             st.session_state.last_meal_context = ""
             st.session_state.meal_camera_open = False
             st.session_state.pop("show_daily_calorie_results", None)
@@ -2918,10 +3127,13 @@ else:
 
     _flash_ok = st.session_state.pop("auth_flash_ok", None)
     _flash_err = st.session_state.pop("auth_flash_err", None)
+    _sess_inv = st.session_state.pop("_session_invalid_notice", None)
     if _flash_ok:
         st.success(_flash_ok)
     if _flash_err:
         st.error(_flash_err)
+    if _sess_inv:
+        st.warning(_sess_inv)
 
     hero_col, form_col = st.columns([1.22, 1], gap="large")
     with hero_col:
@@ -2958,12 +3170,19 @@ else:
                 if not db.is_valid_login_email(raw_e):
                     st.error("Enter a valid sign-in email address.")
                 else:
-                    found, why_fail = db.try_email_password_sign_in(raw_e, lp)
-                    if found:
+                    found, tok_or_err = db.try_email_password_sign_in_reserve_session(raw_e, lp)
+                    if found is not None:
                         st.session_state.user_id = found
                         st.session_state.username = db.get_username(found)
+                        st.session_state.auth_session_token = tok_or_err
                         st.rerun()
-                    elif why_fail == "unverified":
+                    elif tok_or_err == "session_active":
+                        st.error(
+                            "Already another session active. "
+                            "Sign out on the other device or browser, or wait a few minutes after "
+                            "closing the app there, then try again."
+                        )
+                    elif tok_or_err == "unverified":
                         st.error(
                             "Activate your account first—open the link we sent to your email "
                             "(valid 1 hour). After it expires you can register again with the same email."
