@@ -256,8 +256,6 @@ SID Fitness Assistant · Automated message · Do not reply
         f'<p style="margin:24px 0;"><a href="{href}" style="display:inline-block;padding:12px 20px;'
         "background-color:#1d4ed8;color:#ffffff;text-decoration:none;border-radius:8px;"
         'font-weight:600;">Confirm email &amp; continue</a></p>'
-        "<p style=\"font-size:14px;color:#444;\">Or copy and paste this address into your browser:<br/>"
-        f'<span style="word-break:break-all;">{href}</span></p>'
         "<p style=\"font-size:14px;color:#444;\">If you did not register, you can ignore this email.</p>"
         "<p style=\"font-size:12px;color:#888;\">SID Fitness Assistant · Automated message · Do not reply</p>"
     )

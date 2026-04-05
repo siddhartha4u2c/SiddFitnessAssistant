@@ -683,6 +683,97 @@ Recommendation:
 """
 
 
+def _coach_user_wants_illustration(question: str) -> bool:
+    """True when the user is asking for a visual of a concrete exercise or food (triggers image generation)."""
+    t = (question or "").strip().lower()
+    if len(t) < 10:
+        return False
+    visual = any(
+        x in t
+        for x in (
+            "show me",
+            "picture",
+            "image",
+            "photo",
+            "diagram",
+            "illustrate",
+            "draw ",
+            "sketch",
+            "visual",
+            "look like",
+            "what does",
+            "what would",
+            "see ",
+        )
+    )
+    form_demo = any(
+        x in t
+        for x in (
+            " form",
+            "form for",
+            "proper form",
+            "how to do",
+            "how to perform",
+            "technique for",
+            "demonstrat",
+            "demo of",
+            "example of",
+        )
+    )
+    domain = any(
+        w in t
+        for w in (
+            "exercise",
+            "workout",
+            "movement",
+            "gym",
+            "squat",
+            "deadlift",
+            "lunge",
+            "push-up",
+            "pushup",
+            "pull-up",
+            "pullup",
+            "plank",
+            "yoga",
+            "stretch",
+            "lift",
+            "row",
+            "press",
+            "curl",
+            "fly",
+            "crunch",
+            "clean",
+            "snatch",
+            "warmup",
+            "cooldown",
+            "food",
+            "meal",
+            "dish",
+            "eat",
+            "recipe",
+            "breakfast",
+            "lunch",
+            "dinner",
+            "snack",
+            "fruit",
+            "vegetable",
+            "protein",
+            "plate",
+            "bowl",
+            "curry",
+            "roti",
+            "rice",
+            "dal",
+            "smoothie",
+            "salad",
+            "oats",
+            "paneer",
+        )
+    )
+    return domain and (visual or form_demo)
+
+
 def _coach_chat_avatar_path() -> str | None:
     """PNG next to coach replies in chat (``assets/coach_ai_avatar.png``)."""
     p = Path(__file__).resolve().parent / "assets" / "coach_ai_avatar.png"
@@ -746,7 +837,9 @@ GOAL TIMELINE & PROGRESS: A **GOAL TIMELINE** section lists dated moments when t
 - Do **not** invent dates, weights, or events that are not in the timeline or weight log.
 
 If information is missing, say what would help. Reference weight trends only when the log supports it.
-Keep replies readable; use more detail when the user requests full-day or multi-day plans."""
+Keep replies readable; use more detail when the user requests full-day or multi-day plans.
+
+ILLUSTRATIONS: When the user clearly asks to **see** a specific **exercise** (form, technique, how to do it) or a **food/dish** (what it looks like, plated), answer in text as usual. The app may add a generated image on the same screen—your text should still stand alone (describe key cues) so the reply is useful even without the image."""
 
 # Evidence-informed defaults for muscle hypertrophy (use when goal/training/protein questions fit; still personalize to profile, diet pattern, allergies, and energy context).
 COACH_MUSCLE_GAIN_REFERENCE = """
@@ -1117,10 +1210,6 @@ def format_daily_activities_for_coach(rows: list) -> str:
 def _render_daily_activity_logger(user_id: int) -> None:
     """Popover body: log by calendar day; coach prompt includes recent rows."""
     _today = date.today()
-    st.caption(
-        "Log **exercise**, **meals or food**, or **other** notes for any day. Your coach sees roughly the "
-        "**last 90 days**."
-    )
     _log_d = st.session_state.get("sid_activity_log_date")
     if isinstance(_log_d, date) and _log_d > _today:
         st.session_state["sid_activity_log_date"] = _today
@@ -1208,8 +1297,6 @@ def _render_daily_activity_logger(user_id: int) -> None:
                 if st.button(dd, key=f"sid_act_jump_{dd}", use_container_width=True):
                     st.session_state["sid_activity_jump_pending"] = dd
                     st.rerun()
-    elif not day_entries:
-        st.caption("Save an entry above to start your log.")
 
 
 def format_meal_log(rows: list) -> str:
@@ -1881,7 +1968,7 @@ def render_main_content() -> None:
                         except (TypeError, ValueError):
                             pass
                     age_text = st.text_input(
-                        "Age (optional)",
+                        "Age",
                         value=_age_disp,
                         placeholder="e.g. 34",
                         help="Whole years. Leave blank if you prefer not to say.",
@@ -2581,6 +2668,13 @@ def render_main_content() -> None:
             with st.chat_message("user" if is_u else "assistant", **_kw):
                 st.write(m["content"])
 
+        _coach_ill = st.session_state.pop("coach_pending_illustration", None)
+        if _coach_ill and isinstance(_coach_ill, dict):
+            _ib = _coach_ill.get("bytes")
+            if _ib:
+                st.caption("Illustration for your question")
+                st.image(_ib, use_container_width=True)
+
         if coach_q := st.chat_input("Ask the coach…"):
             img_bytes: bytes | None = None
             img_mime = "image/jpeg"
@@ -2616,6 +2710,29 @@ def render_main_content() -> None:
                 )
             if not answer:
                 answer = "No text response (content may have been blocked)."
+            if _coach_user_wants_illustration(coach_q):
+                try:
+                    (iap, _), _fb = gemini_env.resolve_image_api_credentials()
+                    if (iap or "").strip():
+                        ref_ill: bytes | None = None
+                        ill_mime = "image/jpeg"
+                        if prog_up is not None and attach_photo_to_next:
+                            ref_ill = prog_up.getvalue()
+                            ill_mime = _coach_image_mime(getattr(prog_up, "type", None))
+                        with st.spinner("Creating an illustration…"):
+                            img_b, _ill_err = workout_plan.generate_coach_educational_image(
+                                coach_q,
+                                reference_image_bytes=ref_ill,
+                                reference_mime=ill_mime,
+                            )
+                        if img_b:
+                            st.session_state["coach_pending_illustration"] = {
+                                "bytes": img_b,
+                                "mime": "image/png",
+                            }
+                            answer = f"{answer}\n\n_(Illustration with this reply.)_"
+                except ValueError:
+                    pass
             user_chat_line = (
                 f"📷 [Photo attached] {coach_q}" if img_bytes else coach_q
             )

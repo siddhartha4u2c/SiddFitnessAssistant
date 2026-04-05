@@ -710,6 +710,52 @@ def _generate_routed_image(
     return None, err
 
 
+def build_coach_illustration_prompt(user_subject: str) -> str:
+    """Single educational exercise or food illustration; anonymous / no celebrity faces."""
+    subj = (user_subject or "").strip()[:900]
+    return (
+        "Create one clear educational illustration for a fitness and nutrition coaching app.\n"
+        f"User request (focus on this subject only): {subj}\n\n"
+        "If the subject is an exercise or movement: show correct positioning in a clean gym or neutral "
+        "studio; anonymous person, side or back view preferred; no identifiable faces.\n"
+        "If the subject is food: appetizing realistic plated dish or sensible arrangement; respect "
+        "vegetarian/vegan cues from the wording if any.\n"
+        "No text overlays, watermarks, or readable brand logos. Photorealistic or high-quality render."
+    )
+
+
+def generate_coach_educational_image(
+    user_question: str,
+    *,
+    reference_image_bytes: bytes | None = None,
+    reference_mime: str = "image/jpeg",
+) -> tuple[bytes | None, str | None]:
+    """Optional illustration when the coach chat detects a visual request (exercise or food)."""
+    import gemini_env
+
+    try:
+        (pk, pbase), (fk, fbbase) = gemini_env.resolve_image_api_credentials()
+    except ValueError:
+        return None, None
+    prim = (pk or "").strip()
+    if not prim:
+        return None, None
+    model_id = default_image_model()
+    prompt = build_coach_illustration_prompt(user_question)
+    euri_sz = os.getenv("COACH_ILLUSTRATION_EURI_SIZE", "1024x1024").strip() or "1024x1024"
+    return _generate_routed_image(
+        prompt,
+        prim,
+        model_id,
+        reference_image_bytes,
+        reference_mime or "image/jpeg",
+        pbase,
+        fk,
+        fbbase,
+        euri_size=euri_sz,
+    )
+
+
 def generate_day_image(
     api_key: str,
     model_id: str,
