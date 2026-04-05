@@ -642,7 +642,13 @@ if _reset_tok:
                     st.query_params.clear()
                 except Exception:
                     pass
-                st.success(f"{msg_pw} You can sign in from the main app.")
+                _app_url = _public_app_base_url()
+                st.success(msg_pw)
+                st.markdown(
+                    f"**You can sign in now.** Use **{html.escape(un_reset)}** and your new password on the main app page.\n\n"
+                    f"**[Open the app to sign in]({_app_url})**"
+                )
+                st.caption(f"If the link does not work, open this URL manually: `{_app_url}`")
             else:
                 st.error(msg_pw)
     st.stop()
