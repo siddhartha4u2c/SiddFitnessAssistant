@@ -22,8 +22,7 @@ import mailer
 import text_llm
 import workout_plan
 
-load_dotenv(Path(__file__).resolve().parent / ".env")
-db.init_db()
+
 
 
 def _public_app_base_url() -> str:
