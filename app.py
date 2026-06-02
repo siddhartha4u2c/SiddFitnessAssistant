@@ -19,6 +19,10 @@ try:
 except Exception:
     pass
 
+# TEMPORARY DEBUG - remove after fixing
+
+st.write("EURI_API_KEY present:", bool(os.getenv("EURI_API_KEY")))
+st.write("Keys in secrets:", list(st.secrets.keys()) if hasattr(st, 'secrets') else "no secrets")
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
 import db
