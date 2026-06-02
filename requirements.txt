@@ -7,3 +7,13 @@ python-dotenv
 passlib[bcrypt]
 bcrypt>=4.0.1,<4.1.0
 phonenumbers>=8.13.0
+streamlit
+openai>=1.0.0
+google-generativeai
+google-genai
+Pillow
+python-dotenv
+passlib[bcrypt]
+bcrypt>=4.0.1,<4.1.0
+phonenumbers>=8.13.0
+resend
