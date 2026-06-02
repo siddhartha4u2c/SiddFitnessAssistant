@@ -5,22 +5,29 @@ import os
 import re
 from datetime import date
 from pathlib import Path
-import db
+
 import streamlit as st
 import streamlit.components.v1 as components
 from PIL import Image
 from dotenv import load_dotenv
-for key, value in st.secrets.items():
-    if isinstance(value, str):
-        os.environ[key] = value
+
+# Inject Streamlit Cloud secrets into os.environ
+try:
+    for key, value in st.secrets.items():
+        if isinstance(value, str):
+            os.environ[key] = value
+except Exception:
+    pass
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
-db.init_db(
 
+import db
 import gemini_env
 import mailer
 import text_llm
 import workout_plan
+
+db.init_db()
 
 
 
