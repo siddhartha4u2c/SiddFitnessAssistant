@@ -9,6 +9,11 @@ from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 from PIL import Image
+
+# Inject Streamlit secrets into environment variables
+for key, value in st.secrets.items():
+    if isinstance(value, str):
+        os.environ[key] = value
 from dotenv import load_dotenv
 
 import db
