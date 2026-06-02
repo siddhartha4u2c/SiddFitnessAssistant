@@ -5,7 +5,7 @@ import os
 import re
 from datetime import date
 from pathlib import Path
-
+import db
 import streamlit as st
 import streamlit.components.v1 as components
 from PIL import Image
@@ -16,7 +16,7 @@ for key, value in st.secrets.items():
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
 db.init_db(
-import db
+
 import gemini_env
 import mailer
 import text_llm
