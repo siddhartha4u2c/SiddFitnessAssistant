@@ -9,13 +9,13 @@ from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 from PIL import Image
-
-# Inject Streamlit secrets into environment variables
+from dotenv import load_dotenv
 for key, value in st.secrets.items():
     if isinstance(value, str):
         os.environ[key] = value
-from dotenv import load_dotenv
 
+load_dotenv(Path(__file__).resolve().parent / ".env")
+db.init_db(
 import db
 import gemini_env
 import mailer
