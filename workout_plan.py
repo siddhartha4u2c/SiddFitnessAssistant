@@ -83,7 +83,7 @@ def meal_plan_diet_scope_lines(profile: dict, user_chat_texts: list[str]) -> lis
     elif dp == "Vegetarian":
         out.append(
             "**MEAL PROTEIN SCOPE — VEGETARIAN (profile):** Meals must be **lacto-ovo vegetarian**: no meat, poultry, fish, or shellfish. "
-            "**Eggs and dairy are allowed** unless profile/notes rule them out. Across the week, include **both typical vegetarian plates** and "
+            "**Eggs are not allowed** unless profile/notes rule them out. Across the week, include **both typical vegetarian plates** and "
             "**vegan-friendly options or swaps** (e.g. tofu, legumes, plant milk) so vegan and vegetarian styles appear."
         )
     elif dp == "Non vegetarian":
